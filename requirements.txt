@@ -16,4 +16,5 @@ pytest==8.0.1
 httpx==0.27.0
 pyautogen==0.1.14
 autogen-agentchat
-autogen-ext[openai] 
+autogen-ext[openai]
+tenacity==8.2.3 

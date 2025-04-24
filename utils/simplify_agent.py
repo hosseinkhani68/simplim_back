@@ -4,6 +4,8 @@ from utils.vector_store import VectorStore
 import os
 from dotenv import load_dotenv
 from openai import OpenAI
+import time
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 # Load environment variables
 load_dotenv()
@@ -21,12 +23,16 @@ class SimplifyAgent:
         # Initialize OpenAI client
         self.client = OpenAI(api_key=api_key)
         
-        # Configure Autogen
+        # Configure Autogen with retry settings
         config_list = [
             {
                 "model": "gpt-4",
                 "api_key": api_key,
-                "base_url": "https://api.openai.com/v1"
+                "base_url": "https://api.openai.com/v1",
+                "request_timeout": 600,  # 10 minutes timeout
+                "max_retries": 3,  # Maximum number of retries
+                "retry_min_seconds": 1,  # Minimum wait time between retries
+                "retry_max_seconds": 10,  # Maximum wait time between retries
             }
         ]
         
@@ -47,14 +53,16 @@ class SimplifyAgent:
             """
         )
         
-        # Create user proxy agent
+        # Create user proxy agent with increased timeout
         self.user_proxy = autogen.UserProxyAgent(
             name="user_proxy",
             human_input_mode="NEVER",
             max_consecutive_auto_reply=5,
             code_execution_config=False,
+            request_timeout=600,  # 10 minutes timeout
         )
 
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     async def simplify_text(self, text: str, user_id: int, 
                           previous_context: List[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
@@ -87,11 +95,17 @@ class SimplifyAgent:
             4. Is appropriate for a general audience
             """
             
-            # Start the conversation
-            chat_result = await self.user_proxy.initiate_chat(
-                self.assistant,
-                message=message
-            )
+            # Start the conversation with retry logic
+            try:
+                chat_result = await self.user_proxy.initiate_chat(
+                    self.assistant,
+                    message=message
+                )
+            except Exception as e:
+                if "service unavailable" in str(e).lower():
+                    time.sleep(5)  # Wait before retrying
+                    raise  # Re-raise to trigger retry
+                raise
             
             # Get the simplified text from the last message
             simplified_text = chat_result.last_message()["content"]
@@ -113,6 +127,7 @@ class SimplifyAgent:
         except Exception as e:
             raise Exception(f"Error in text simplification: {str(e)}")
 
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     async def handle_follow_up(self, text: str, user_id: int, 
                              previous_point_id: int) -> Dict[str, Any]:
         """
@@ -133,11 +148,17 @@ class SimplifyAgent:
             User feedback: {text}
             """
             
-            # Start the conversation
-            chat_result = await self.user_proxy.initiate_chat(
-                self.assistant,
-                message=context
-            )
+            # Start the conversation with retry logic
+            try:
+                chat_result = await self.user_proxy.initiate_chat(
+                    self.assistant,
+                    message=context
+                )
+            except Exception as e:
+                if "service unavailable" in str(e).lower():
+                    time.sleep(5)  # Wait before retrying
+                    raise  # Re-raise to trigger retry
+                raise
             
             # Get the new simplified text
             new_simplified_text = chat_result.last_message()["content"]
