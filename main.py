@@ -40,20 +40,35 @@ app.include_router(simplify.router, prefix="/simplify", tags=["Simplify"])
 app.include_router(pdf.router, prefix="/pdf", tags=["PDF Management"])
 
 def check_database_connection():
-    if not MYSQL_URL:
+    if not os.getenv("MYSQL_URL"):
         return False
     try:
+        # Parse the MySQL URL
+        mysql_url = os.getenv("MYSQL_URL")
+        # Remove the mysql:// prefix
+        mysql_url = mysql_url.replace("mysql://", "")
+        # Split into parts
+        credentials, host_port_db = mysql_url.split("@")
+        user, password = credentials.split(":")
+        host_port, database = host_port_db.split("/")
+        host, port = host_port.split(":")
+        
         connection = mysql.connector.connect(
-            host=MYSQL_URL,
-            user=os.getenv("MYSQL_USER"),
-            password=os.getenv("MYSQL_PASSWORD"),
-            database=os.getenv("MYSQL_DATABASE")
+            host=host,
+            user=user,
+            password=password,
+            database=database,
+            port=int(port)
         )
         if connection.is_connected():
             connection.close()
             return True
         return False
-    except Error:
+    except Error as e:
+        print(f"Database connection error: {str(e)}")
+        return False
+    except Exception as e:
+        print(f"Error parsing MySQL URL: {str(e)}")
         return False
 
 @app.get("/", status_code=status.HTTP_200_OK)
