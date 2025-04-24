@@ -6,6 +6,8 @@ from dotenv import load_dotenv
 from openai import OpenAI
 import time
 from tenacity import retry, stop_after_attempt, wait_exponential
+from fastapi import HTTPException
+import re
 
 # Load environment variables
 load_dotenv()
@@ -24,7 +26,7 @@ class SimplifyAgent:
         self.client = OpenAI(api_key=api_key)
         
         # Configure Autogen with retry settings
-        config_list = [
+        self.config_list = [
             {
                 "model": "gpt-4",
                 "api_key": api_key,
@@ -40,7 +42,7 @@ class SimplifyAgent:
         self.assistant = autogen.AssistantAgent(
             name="simplify_assistant",
             llm_config={
-                "config_list": config_list,
+                "config_list": self.config_list,
                 "temperature": 0.7,
             },
             system_message="""You are a text simplification expert. Your goal is to explain complex concepts in simple terms.
@@ -62,11 +64,37 @@ class SimplifyAgent:
             request_timeout=600,  # 10 minutes timeout
         )
 
+    def _fallback_simplification(self, text: str) -> str:
+        """
+        Fallback method when OpenAI API is unavailable.
+        Uses a simple rule-based approach to simplify text.
+        """
+        # Basic simplification rules
+        rules = [
+            (r'\b(?:is|are|was|were)\b', 'is'),
+            (r'\b(?:very|extremely|really)\b', ''),
+            (r'\b(?:therefore|thus|hence)\b', 'so'),
+            (r'\b(?:however|nevertheless|nonetheless)\b', 'but'),
+            (r'\b(?:utilize|utilization)\b', 'use'),
+            (r'\b(?:commence|initiate)\b', 'start'),
+            (r'\b(?:terminate|cease)\b', 'stop'),
+            (r'\b(?:approximately|roughly)\b', 'about'),
+            (r'\b(?:subsequently|afterward)\b', 'then'),
+            (r'\b(?:prior to|beforehand)\b', 'before'),
+        ]
+        
+        simplified = text
+        for pattern, replacement in rules:
+            simplified = re.sub(pattern, replacement, simplified, flags=re.IGNORECASE)
+        
+        return simplified
+
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     async def simplify_text(self, text: str, user_id: int, 
                           previous_context: List[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Simplify text using Autogen with context from vector store.
+        Falls back to rule-based simplification if OpenAI API is unavailable.
         """
         try:
             # Find similar previous simplifications
@@ -101,14 +129,13 @@ class SimplifyAgent:
                     self.assistant,
                     message=message
                 )
+                simplified_text = chat_result.last_message()["content"]
             except Exception as e:
                 if "service unavailable" in str(e).lower():
-                    time.sleep(5)  # Wait before retrying
-                    raise  # Re-raise to trigger retry
-                raise
-            
-            # Get the simplified text from the last message
-            simplified_text = chat_result.last_message()["content"]
+                    # Use fallback simplification
+                    simplified_text = self._fallback_simplification(text)
+                else:
+                    raise
             
             # Store the simplification in vector database
             point_id = self.vector_store.store_simplification(
@@ -121,17 +148,22 @@ class SimplifyAgent:
             return {
                 "original_text": text,
                 "simplified_text": simplified_text,
-                "point_id": point_id
+                "point_id": point_id,
+                "used_fallback": "service unavailable" in str(e).lower() if 'e' in locals() else False
             }
             
         except Exception as e:
-            raise Exception(f"Error in text simplification: {str(e)}")
+            raise HTTPException(
+                status_code=503,
+                detail=f"Service temporarily unavailable. Please try again later. Error: {str(e)}"
+            )
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     async def handle_follow_up(self, text: str, user_id: int, 
                              previous_point_id: int) -> Dict[str, Any]:
         """
         Handle follow-up questions or requests for further simplification.
+        Falls back to rule-based simplification if OpenAI API is unavailable.
         """
         try:
             # Get the previous simplification
@@ -154,14 +186,13 @@ class SimplifyAgent:
                     self.assistant,
                     message=context
                 )
+                new_simplified_text = chat_result.last_message()["content"]
             except Exception as e:
                 if "service unavailable" in str(e).lower():
-                    time.sleep(5)  # Wait before retrying
-                    raise  # Re-raise to trigger retry
-                raise
-            
-            # Get the new simplified text
-            new_simplified_text = chat_result.last_message()["content"]
+                    # Use fallback simplification
+                    new_simplified_text = self._fallback_simplification(previous_simplification['original_text'])
+                else:
+                    raise
             
             # Store the new simplification
             point_id = self.vector_store.store_simplification(
@@ -174,8 +205,12 @@ class SimplifyAgent:
             return {
                 "original_text": previous_simplification['original_text'],
                 "simplified_text": new_simplified_text,
-                "point_id": point_id
+                "point_id": point_id,
+                "used_fallback": "service unavailable" in str(e).lower() if 'e' in locals() else False
             }
             
         except Exception as e:
-            raise Exception(f"Error handling follow-up: {str(e)}") 
+            raise HTTPException(
+                status_code=503,
+                detail=f"Service temporarily unavailable. Please try again later. Error: {str(e)}"
+            ) 
