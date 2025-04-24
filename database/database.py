@@ -7,6 +7,7 @@ import os
 # Load environment variables
 load_dotenv()
 
+
 # Get MySQL configuration from Railway environment variables
 MYSQL_USER = os.getenv("MYSQLUSER", "root")
 MYSQL_PASSWORD = os.getenv("MYSQLPASSWORD")
