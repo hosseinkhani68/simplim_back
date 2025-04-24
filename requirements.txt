@@ -1,5 +1,5 @@
 fastapi==0.109.2
-uvicorn==0.15.0
+uvicorn==0.27.1
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 python-multipart==0.0.5
@@ -7,7 +7,10 @@ pydantic[email]==2.6.1
 sqlalchemy==1.4.23
 pymysql==1.0.2
 python-dotenv==0.19.0
-autogen==0.1.0
-openai==0.27.0
+pyautogen==0.8.7
+openai==1.12.0
 python-magic==0.4.27
-qdrant-client==1.13.3 
+qdrant-client==1.13.3
+sentence-transformers==2.2.2
+torch==2.2.1
+transformers==4.37.2 
