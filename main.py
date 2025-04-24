@@ -6,6 +6,8 @@ from dotenv import load_dotenv
 import time
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import HTTPException
+import mysql.connector
+from mysql.connector import Error
 
 # Load environment variables
 load_dotenv()
@@ -14,6 +16,7 @@ load_dotenv()
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 PORT = int(os.getenv("PORT", "8000"))
 HOST = os.getenv("HOST", "0.0.0.0")
+MYSQL_URL = os.getenv("MYSQL_URL")
 
 app = FastAPI(
     title="Simplim Backend",
@@ -35,6 +38,23 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 app.include_router(simplify.router, prefix="/simplify", tags=["Simplify"])
 app.include_router(pdf.router, prefix="/pdf", tags=["PDF Management"])
+
+def check_database_connection():
+    if not MYSQL_URL:
+        return False
+    try:
+        connection = mysql.connector.connect(
+            host=MYSQL_URL,
+            user=os.getenv("MYSQL_USER"),
+            password=os.getenv("MYSQL_PASSWORD"),
+            database=os.getenv("MYSQL_DATABASE")
+        )
+        if connection.is_connected():
+            connection.close()
+            return True
+        return False
+    except Error:
+        return False
 
 @app.get("/", status_code=status.HTTP_200_OK)
 async def root():
@@ -58,15 +78,18 @@ async def root():
 @app.get("/health", status_code=status.HTTP_200_OK)
 async def health_check():
     try:
+        # Check database connection
+        db_status = check_database_connection()
+        
         # Check if the application can respond
         health_status = {
-            "status": "healthy",
+            "status": "healthy" if db_status else "degraded",
             "environment": ENVIRONMENT,
             "version": "1.0.0",
             "timestamp": time.time(),
             "services": {
                 "api": "up",
-                "database": "up" if os.getenv("MYSQL_URL") else "down",
+                "database": "up" if db_status else "down",
                 "openai": "up" if os.getenv("OPENAI_API_KEY") else "down"
             }
         }
