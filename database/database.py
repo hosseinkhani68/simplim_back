@@ -7,16 +7,14 @@ import os
 # Load environment variables
 load_dotenv()
 
+# Get MySQL URL from Railway
+MYSQL_URL = os.getenv("MYSQL_URL")
 
-# Get MySQL configuration from Railway environment variables
-MYSQL_USER = os.getenv("MYSQLUSER", "root")
-MYSQL_PASSWORD = os.getenv("MYSQLPASSWORD")
-MYSQL_HOST = os.getenv("MYSQLHOST", "containers-us-west-181.railway.app")  # Use public host
-MYSQL_PORT = os.getenv("MYSQLPORT", "3306")
-MYSQL_DATABASE = os.getenv("MYSQLDATABASE", "railway")
+if not MYSQL_URL:
+    raise ValueError("MYSQL_URL environment variable is not set")
 
-# Create MySQL URL
-SQLALCHEMY_DATABASE_URL = f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}"
+# Convert mysql:// to mysql+pymysql:// for SQLAlchemy
+SQLALCHEMY_DATABASE_URL = MYSQL_URL.replace("mysql://", "mysql+pymysql://")
 
 # Create engine with Railway-specific settings
 engine = create_engine(
