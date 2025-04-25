@@ -3,6 +3,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
 import os
+import urllib.parse
 
 # Load environment variables
 load_dotenv()
@@ -13,8 +14,18 @@ MYSQL_URL = os.getenv("MYSQL_URL")
 if not MYSQL_URL:
     raise ValueError("MYSQL_URL environment variable is not set")
 
-# Convert mysql:// to mysql+pymysql:// for SQLAlchemy
-SQLALCHEMY_DATABASE_URL = MYSQL_URL.replace("mysql://", "mysql+pymysql://")
+# Parse the MySQL URL
+parsed_url = urllib.parse.urlparse(MYSQL_URL)
+username = parsed_url.username
+password = parsed_url.password
+hostname = parsed_url.hostname
+port = parsed_url.port or 3306
+database = parsed_url.path.lstrip('/')
+
+# Create SQLAlchemy URL
+SQLALCHEMY_DATABASE_URL = f"mysql+pymysql://{username}:{password}@{hostname}:{port}/{database}"
+
+print(f"Connecting to database at: {hostname}:{port}")  # For debugging
 
 # Create engine with Railway-specific settings
 engine = create_engine(
@@ -23,7 +34,11 @@ engine = create_engine(
     pool_recycle=3600,   # Recycle connections after 1 hour
     pool_size=5,         # Maximum number of connections to keep open
     max_overflow=10,     # Maximum number of connections to create above pool_size
-    echo=False          # Set to True for debugging SQL queries
+    echo=True,          # Set to True for debugging SQL queries
+    connect_args={
+        "connect_timeout": 10,  # 10 second timeout
+        "ssl": {"verify_cert": False}  # Disable SSL verification for internal connections
+    }
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
