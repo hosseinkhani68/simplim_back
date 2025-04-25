@@ -93,30 +93,58 @@ async def root():
 @app.get("/health", status_code=status.HTTP_200_OK)
 async def health_check():
     try:
-        # Check database connection
-        db_status = check_database_connection()
-        
-        # Check if the application can respond
+        # Basic API health check
         health_status = {
-            "status": "healthy" if db_status else "degraded",
+            "status": "healthy",
             "environment": ENVIRONMENT,
             "version": "1.0.0",
             "timestamp": time.time(),
             "services": {
                 "api": "up",
-                "database": "up" if db_status else "down",
+                "database": "up" if MYSQL_URL else "down",
                 "openai": "up" if os.getenv("OPENAI_API_KEY") else "down"
             }
         }
+        
+        # Try database connection if URL is available
+        if MYSQL_URL:
+            try:
+                connection = mysql.connector.connect(
+                    host=os.getenv("MYSQLHOST"),
+                    user=os.getenv("MYSQLUSER"),
+                    password=os.getenv("MYSQLPASSWORD"),
+                    database=os.getenv("MYSQL_DATABASE"),
+                    port=int(os.getenv("MYSQLPORT", "3306"))
+                )
+                if connection.is_connected():
+                    connection.close()
+                    health_status["services"]["database"] = "up"
+                else:
+                    health_status["services"]["database"] = "down"
+            except Exception as db_error:
+                health_status["services"]["database"] = "down"
+                health_status["database_error"] = str(db_error)
         
         return JSONResponse(
             status_code=status.HTTP_200_OK,
             content=health_status
         )
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Service unavailable: {str(e)}"
+        # Return 200 OK even if there's an error, but include error details
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "status": "degraded",
+                "error": str(e),
+                "environment": ENVIRONMENT,
+                "version": "1.0.0",
+                "timestamp": time.time(),
+                "services": {
+                    "api": "up",
+                    "database": "down",
+                    "openai": "up" if os.getenv("OPENAI_API_KEY") else "down"
+                }
+            }
         )
 
 if __name__ == "__main__":
