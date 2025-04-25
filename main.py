@@ -93,57 +93,27 @@ async def root():
 @app.get("/health", status_code=status.HTTP_200_OK)
 async def health_check():
     try:
-        # Basic API health check
-        health_status = {
-            "status": "healthy",
-            "environment": ENVIRONMENT,
-            "version": "1.0.0",
-            "timestamp": time.time(),
-            "services": {
-                "api": "up",
-                "database": "up" if MYSQL_URL else "down",
-                "openai": "up" if os.getenv("OPENAI_API_KEY") else "down"
-            }
-        }
-        
-        # Try database connection if URL is available
-        if MYSQL_URL:
-            try:
-                connection = mysql.connector.connect(
-                    host=os.getenv("MYSQLHOST"),
-                    user=os.getenv("MYSQLUSER"),
-                    password=os.getenv("MYSQLPASSWORD"),
-                    database=os.getenv("MYSQL_DATABASE"),
-                    port=int(os.getenv("MYSQLPORT", "3306"))
-                )
-                if connection.is_connected():
-                    connection.close()
-                    health_status["services"]["database"] = "up"
-                else:
-                    health_status["services"]["database"] = "down"
-            except Exception as db_error:
-                health_status["services"]["database"] = "down"
-                health_status["database_error"] = str(db_error)
-        
+        # Basic health check without database dependency
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content=health_status
+            content={
+                "status": "healthy",
+                "message": "API is running",
+                "environment": ENVIRONMENT,
+                "version": "1.0.0",
+                "timestamp": time.time()
+            }
         )
     except Exception as e:
-        # Return 200 OK even if there's an error, but include error details
+        # Still return 200 OK but with error details
         return JSONResponse(
             status_code=status.HTTP_200_OK,
             content={
                 "status": "degraded",
-                "error": str(e),
+                "message": f"API is running but encountered an error: {str(e)}",
                 "environment": ENVIRONMENT,
                 "version": "1.0.0",
-                "timestamp": time.time(),
-                "services": {
-                    "api": "up",
-                    "database": "down",
-                    "openai": "up" if os.getenv("OPENAI_API_KEY") else "down"
-                }
+                "timestamp": time.time()
             }
         )
 
