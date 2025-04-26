@@ -3,21 +3,41 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
 import os
+import urllib.parse
 
 # Load environment variables
 load_dotenv()
 
+# Get environment
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+
 # Get MySQL connection parameters
-MYSQL_USER = os.getenv("MYSQLUSER")
-MYSQL_PASSWORD = os.getenv("MYSQLPASSWORD")
-MYSQL_HOST = os.getenv("MYSQLHOST")
-MYSQL_PORT = os.getenv("MYSQLPORT")
-MYSQL_DATABASE = os.getenv("MYSQL_DATABASE")
+if ENVIRONMENT == "production":
+    # Use internal URL for Railway deployment
+    MYSQL_USER = os.getenv("MYSQLUSER")
+    MYSQL_PASSWORD = os.getenv("MYSQLPASSWORD")
+    MYSQL_HOST = os.getenv("MYSQLHOST")
+    MYSQL_PORT = os.getenv("MYSQLPORT")
+    MYSQL_DATABASE = os.getenv("MYSQL_DATABASE")
+else:
+    # Use public URL for local development
+    MYSQL_PUBLIC_URL = os.getenv("MYSQL_PUBLIC_URL")
+    if not MYSQL_PUBLIC_URL:
+        raise ValueError("MYSQL_PUBLIC_URL environment variable is not set")
+    
+    # Parse the public URL
+    parsed_url = urllib.parse.urlparse(MYSQL_PUBLIC_URL)
+    MYSQL_USER = parsed_url.username
+    MYSQL_PASSWORD = parsed_url.password
+    MYSQL_HOST = parsed_url.hostname
+    MYSQL_PORT = parsed_url.port or 3306
+    MYSQL_DATABASE = parsed_url.path.lstrip('/')
 
 # Create SQLAlchemy URL
 SQLALCHEMY_DATABASE_URL = f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}"
 
 print(f"Connecting to database at: {MYSQL_HOST}:{MYSQL_PORT}")  # For debugging
+print(f"Environment: {ENVIRONMENT}")  # For debugging
 
 # Create engine with Railway-specific settings
 engine = create_engine(
