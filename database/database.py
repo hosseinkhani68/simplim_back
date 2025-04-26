@@ -40,11 +40,6 @@ def get_db_url():
             MYSQL_PUBLIC_URL = os.getenv("MYSQL_PUBLIC_URL")
             if not MYSQL_PUBLIC_URL:
                 raise ValueError("MYSQL_PUBLIC_URL environment variable is not set")
-            
-            # Ensure the URL uses pymysql
-            parsed_url = urllib.parse.urlparse(MYSQL_PUBLIC_URL)
-            if parsed_url.scheme == "mysql":
-                return MYSQL_PUBLIC_URL.replace("mysql://", "mysql+pymysql://", 1)
             return MYSQL_PUBLIC_URL
     except Exception as e:
         logger.error(f"Error getting database URL: {str(e)}")
@@ -60,17 +55,18 @@ def init_db():
         # Create engine with connection parameters
         engine = create_engine(
             db_url,
-            pool_pre_ping=True,  # Enable connection health checks
-            pool_recycle=3600,   # Recycle connections after 1 hour
+            pool_pre_ping=True,
+            pool_recycle=3600,
             connect_args={
-                "connect_timeout": 10,  # Connection timeout in seconds
-                "read_timeout": 10,     # Read timeout in seconds
-                "write_timeout": 10     # Write timeout in seconds
+                "connect_timeout": 10,
+                "read_timeout": 10,
+                "write_timeout": 10
             }
         )
         
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
         logger.info("Database connection initialized successfully")
+        return engine  # Return the engine for immediate use
     except Exception as e:
         logger.error(f"Error initializing database: {str(e)}")
         raise
@@ -84,4 +80,12 @@ def get_db():
         db.close()
 
 # Create Base for models
-Base = declarative_base() 
+Base = declarative_base()
+
+# Initialize the database connection immediately
+try:
+    engine = init_db()
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+except Exception as e:
+    logger.error(f"Failed to initialize database on module load: {str(e)}")
+    raise 
