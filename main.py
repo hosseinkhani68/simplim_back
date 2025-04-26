@@ -63,8 +63,15 @@ async def root():
         "message": "Welcome to Simplim API",
         "status": "ok",
         "version": "1.0.0",
-        "timestamp": datetime.utcnow().isoformat(),
-        "environment": ENVIRONMENT
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for Railway"""
+    return {
+        "status": "ok",
+        "timestamp": datetime.utcnow().isoformat()
     }
 
 @app.get("/db-status")
