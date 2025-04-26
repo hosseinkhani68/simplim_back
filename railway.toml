@@ -10,11 +10,9 @@ healthcheckTimeout = 5
 initialDelay = 5
 interval = 10
 timeout = 5
-restartPolicyType = "on-failure"
-restartPolicyMaxRetries = 3
 
 [deploy.healthcheck]
-path = "/"
+path = "/health"
 initialDelay = 10
 interval = 15
 timeout = 5
