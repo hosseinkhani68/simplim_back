@@ -30,7 +30,7 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
+# app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 
 @app.get("/")
 async def root(db: Session = Depends(get_db)):
