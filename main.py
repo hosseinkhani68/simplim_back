@@ -52,23 +52,23 @@ async def root():
         "status": "healthy"
     }
 
-@app.get("/db-status")
-async def db_status(db: Session = Depends(get_db)):
-    """Endpoint to check database connection status"""
-    try:
-        logger.info("Attempting database connection...")
-        # Test database connection by counting users
-        user_count = db.query(User).count()
-        logger.info(f"Database connection successful. Found {user_count} users.")
-        return {
-            "status": "connected",
-            "tables": ["users", "text_history", "pdf_document"],
-            "user_count": user_count
-        }
-    except Exception as e:
-        logger.error(f"Database connection failed: {str(e)}")
-        return {
-            "status": "disconnected",
-            "error": str(e),
-            "host": os.getenv("MYSQLHOST")
-        }
+# @app.get("/db-status")
+# async def db_status(db: Session = Depends(get_db)):
+#     """Endpoint to check database connection status"""
+#     try:
+#         logger.info("Attempting database connection...")
+#         # Test database connection by counting users
+#         user_count = db.query(User).count()
+#         logger.info(f"Database connection successful. Found {user_count} users.")
+#         return {
+#             "status": "connected",
+#             "tables": ["users", "text_history", "pdf_document"],
+#             "user_count": user_count
+#         }
+#     except Exception as e:
+#         logger.error(f"Database connection failed: {str(e)}")
+#         return {
+#             "status": "disconnected",
+#             "error": str(e),
+#             "host": os.getenv("MYSQLHOST")
+#         }
