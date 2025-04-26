@@ -4,16 +4,16 @@ buildCommand = "pip install -r requirements.txt"
 pythonVersion = "3.11"
 
 [deploy]
-startCommand = "python init_db.py && sleep 5 && uvicorn main:app --host 0.0.0.0 --port $PORT"
+startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT"
 healthcheckPath = "/"
-healthcheckTimeout = 100
+healthcheckTimeout = 30
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 10
 
 [deploy.healthcheck]
 path = "/"
-initialDelay = 30
-interval = 30
-timeout = 10
+initialDelay = 10
+interval = 15
+timeout = 5
 successThreshold = 1
 failureThreshold = 3

@@ -60,30 +60,14 @@ async def health_check(db: Session = Depends(get_db)):
     return {"status": "healthy", "database": "connected"}
 
 @app.get("/", status_code=status.HTTP_200_OK)
-async def root(db: Session = Depends(get_db)):
-    try:
-        print("Attempting to connect to database...")  # Debug log
-        # Check database connection
-        db.execute("SELECT 1")
-        print("Database connection successful")  # Debug log
-        
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content={
-                "message": "Welcome to Simplim Backend API",
-                "status": "healthy",
-                "database": "connected",
-                "version": "1.0.0",
-                "timestamp": time.time(),
-                "environment": ENVIRONMENT
-            }
-        )
-    except Exception as e:
-        print(f"Database connection failed: {str(e)}")  # Debug log
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Service unavailable: {str(e)}"
-        )
+async def root():
+    return {
+        "message": "Welcome to Simplim Backend API",
+        "status": "healthy",
+        "version": "1.0.0",
+        "timestamp": time.time(),
+        "environment": ENVIRONMENT
+    }
 
 if __name__ == "__main__":
     import uvicorn
