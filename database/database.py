@@ -3,29 +3,21 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
 import os
-import urllib.parse
 
 # Load environment variables
 load_dotenv()
 
-# Get MySQL URL from Railway
-MYSQL_URL = os.getenv("MYSQL_URL")
-
-if not MYSQL_URL:
-    raise ValueError("MYSQL_URL environment variable is not set")
-
-# Parse the MySQL URL
-parsed_url = urllib.parse.urlparse(MYSQL_URL)
-username = parsed_url.username
-password = parsed_url.password
-hostname = parsed_url.hostname
-port = parsed_url.port or 3306
-database = parsed_url.path.lstrip('/')
+# Get MySQL connection parameters
+MYSQL_USER = os.getenv("MYSQLUSER")
+MYSQL_PASSWORD = os.getenv("MYSQLPASSWORD")
+MYSQL_HOST = os.getenv("MYSQLHOST")
+MYSQL_PORT = os.getenv("MYSQLPORT")
+MYSQL_DATABASE = os.getenv("MYSQL_DATABASE")
 
 # Create SQLAlchemy URL
-SQLALCHEMY_DATABASE_URL = f"mysql+pymysql://{username}:{password}@{hostname}:{port}/{database}"
+SQLALCHEMY_DATABASE_URL = f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}"
 
-print(f"Connecting to database at: {hostname}:{port}")  # For debugging
+print(f"Connecting to database at: {MYSQL_HOST}:{MYSQL_PORT}")  # For debugging
 
 # Create engine with Railway-specific settings
 engine = create_engine(

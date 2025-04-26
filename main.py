@@ -16,7 +16,7 @@ load_dotenv()
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 PORT = int(os.getenv("PORT", "8000"))
 HOST = os.getenv("HOST", "0.0.0.0")
-MYSQL_URL = os.getenv("MYSQL_URL")
+MYSQL_PUBLIC_URL = os.getenv("MYSQL_PUBLIC_URL")
 
 app = FastAPI(
     title="Simplim Backend",
@@ -40,15 +40,15 @@ app.include_router(simplify.router, prefix="/simplify", tags=["Simplify"])
 app.include_router(pdf.router, prefix="/pdf", tags=["PDF Management"])
 
 def check_database_connection():
-    if not os.getenv("MYSQL_URL"):
+    if not os.getenv("MYSQL_PUBLIC_URL"):
         return False
     try:
         # Parse the MySQL URL
-        mysql_url = os.getenv("MYSQL_URL")
+        MYSQL_PUBLIC_URL = os.getenv("MYSQL_PUBLIC_URL")
         # Remove the mysql:// prefix
-        mysql_url = mysql_url.replace("mysql://", "")
+        MYSQL_PUBLIC_URL = MYSQL_PUBLIC_URL.replace("mysql://", "")
         # Split into parts
-        credentials, host_port_db = mysql_url.split("@")
+        credentials, host_port_db = MYSQL_PUBLIC_URL.split("@")
         user, password = credentials.split(":")
         host_port, database = host_port_db.split("/")
         host, port = host_port.split(":")
