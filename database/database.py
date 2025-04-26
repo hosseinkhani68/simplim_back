@@ -34,13 +34,17 @@ def get_db_url():
             if not all([MYSQL_USER, MYSQL_PASSWORD, MYSQL_HOST, MYSQL_PORT, MYSQL_DATABASE]):
                 raise ValueError("Missing required MySQL environment variables")
                 
-            return f"mysql://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}"
+            return f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}"
         else:
             # Use public URL for local development
             MYSQL_PUBLIC_URL = os.getenv("MYSQL_PUBLIC_URL")
             if not MYSQL_PUBLIC_URL:
                 raise ValueError("MYSQL_PUBLIC_URL environment variable is not set")
             
+            # Ensure the URL uses pymysql
+            parsed_url = urllib.parse.urlparse(MYSQL_PUBLIC_URL)
+            if parsed_url.scheme == "mysql":
+                return MYSQL_PUBLIC_URL.replace("mysql://", "mysql+pymysql://", 1)
             return MYSQL_PUBLIC_URL
     except Exception as e:
         logger.error(f"Error getting database URL: {str(e)}")
