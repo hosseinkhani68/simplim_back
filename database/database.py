@@ -34,7 +34,7 @@ def get_db_url():
             if not all([MYSQL_USER, MYSQL_PASSWORD, MYSQL_HOST, MYSQL_PORT, MYSQL_DATABASE]):
                 raise ValueError("Missing required MySQL environment variables")
                 
-            return f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}"
+            return f"mysql://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}"
         else:
             # Use public URL for local development
             MYSQL_PUBLIC_URL = os.getenv("MYSQL_PUBLIC_URL")
@@ -50,32 +50,29 @@ def init_db():
     """Initialize database connection"""
     global engine, SessionLocal
     try:
-        if engine is None:
-            db_url = get_db_url()
-            logger.info(f"Initializing database connection to: {db_url}")
-            
-            engine = create_engine(
-                db_url,
-                pool_pre_ping=True,
-                pool_recycle=3600,
-                pool_size=5,
-                max_overflow=10,
-                echo=False,  # Set to False in production
-                connect_args={
-                    "connect_timeout": 10
-                }
-            )
-            SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-            logger.info("Database connection initialized successfully")
+        db_url = get_db_url()
+        logger.info(f"Initializing database connection to: {db_url}")
+        
+        # Create engine with connection parameters
+        engine = create_engine(
+            db_url,
+            pool_pre_ping=True,  # Enable connection health checks
+            pool_recycle=3600,   # Recycle connections after 1 hour
+            connect_args={
+                "connect_timeout": 10,  # Connection timeout in seconds
+                "read_timeout": 10,     # Read timeout in seconds
+                "write_timeout": 10     # Write timeout in seconds
+            }
+        )
+        
+        SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+        logger.info("Database connection initialized successfully")
     except Exception as e:
         logger.error(f"Error initializing database: {str(e)}")
         raise
 
 def get_db():
     """Get database session"""
-    if SessionLocal is None:
-        init_db()
-    
     db = SessionLocal()
     try:
         yield db

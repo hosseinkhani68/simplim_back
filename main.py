@@ -4,6 +4,7 @@ import os
 from dotenv import load_dotenv
 from database.database import get_db, init_db
 from sqlalchemy.orm import Session
+from database.models import User
 import logging
 
 # Configure logging
@@ -55,11 +56,12 @@ async def root():
 async def db_status(db: Session = Depends(get_db)):
     """Check database connection status"""
     try:
-        # Test database connection
-        db.execute("SELECT 1")
+        # Test database connection by querying User table
+        user_count = db.query(User).count()
         return {
             "status": "connected",
-            "message": "Database connection successful"
+            "message": "Database connection successful",
+            "user_count": user_count
         }
     except Exception as e:
         logger.error(f"Database connection failed: {str(e)}")
