@@ -43,27 +43,32 @@ app.add_middleware(
 # app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 
 @app.get("/")
-async def root(db: Session = Depends(get_db)):
+async def root():
+    """Simple health check endpoint that doesn't depend on database"""
+    return {
+        "message": "Hello from Simplim",
+        "environment": ENVIRONMENT,
+        "version": "1.0.0",
+        "status": "healthy"
+    }
+
+@app.get("/db-status")
+async def db_status(db: Session = Depends(get_db)):
+    """Endpoint to check database connection status"""
     try:
         logger.info("Attempting database connection...")
         # Test database connection by counting users
         user_count = db.query(User).count()
         logger.info(f"Database connection successful. Found {user_count} users.")
         return {
-            "message": "Hello from Simplim",
-            "environment": ENVIRONMENT,
-            "version": "1.0.0",
-            "database": "connected",
+            "status": "connected",
             "tables": ["users", "text_history", "pdf_document"],
             "user_count": user_count
         }
     except Exception as e:
         logger.error(f"Database connection failed: {str(e)}")
         return {
-            "message": "Hello from Simplim",
-            "environment": ENVIRONMENT,
-            "version": "1.0.0",
-            "database": "disconnected",
+            "status": "disconnected",
             "error": str(e),
             "host": os.getenv("MYSQLHOST")
         }
