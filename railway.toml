@@ -5,13 +5,13 @@ pythonVersion = "3.11"
 
 [deploy]
 startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT"
-healthcheckPath = "/"
+healthcheckPath = "/health"
 healthcheckTimeout = 30
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 10
 
 [deploy.healthcheck]
-path = "/"
+path = "/health"
 initialDelay = 10
 interval = 15
 timeout = 5
