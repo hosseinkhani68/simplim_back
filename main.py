@@ -90,32 +90,32 @@ async def root():
             detail=f"Internal server error: {str(e)}"
         )
 
-@app.get("/health", status_code=status.HTTP_200_OK)
-async def health_check():
-    try:
-        # Basic health check without database dependency
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content={
-                "status": "healthy",
-                "message": "API is running",
-                "environment": ENVIRONMENT,
-                "version": "1.0.0",
-                "timestamp": time.time()
-            }
-        )
-    except Exception as e:
-        # Still return 200 OK but with error details
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content={
-                "status": "degraded",
-                "message": f"API is running but encountered an error: {str(e)}",
-                "environment": ENVIRONMENT,
-                "version": "1.0.0",
-                "timestamp": time.time()
-            }
-        )
+# @app.get("/health", status_code=status.HTTP_200_OK)
+# async def health_check():
+#     try:
+#         # Basic health check without database dependency
+#         return JSONResponse(
+#             status_code=status.HTTP_200_OK,
+#             content={
+#                 "status": "healthy",
+#                 "message": "API is running",
+#                 "environment": ENVIRONMENT,
+#                 "version": "1.0.0",
+#                 "timestamp": time.time()
+#             }
+#         )
+#     except Exception as e:
+#         # Still return 200 OK but with error details
+#         return JSONResponse(
+#             status_code=status.HTTP_200_OK,
+#             content={
+#                 "status": "degraded",
+#                 "message": f"API is running but encountered an error: {str(e)}",
+#                 "environment": ENVIRONMENT,
+#                 "version": "1.0.0",
+#                 "timestamp": time.time()
+#             }
+#         )
 
 if __name__ == "__main__":
     import uvicorn
