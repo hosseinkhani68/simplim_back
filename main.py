@@ -1,8 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from dotenv import load_dotenv
 from routers import auth
+from database.database import get_db, engine
+from sqlalchemy.orm import Session
 
 # Load environment variables
 load_dotenv()
@@ -31,17 +33,21 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 
 @app.get("/")
-async def root():
-    return {
-        "message": "Hello from Simplim",
-        "environment": ENVIRONMENT,
-        "version": "1.0.0"
-    }
-
-@app.get("/")
-async def health_check():
-    return {
-        "status": "healthy",
-        "service": "simplim_back",
-        "environment": ENVIRONMENT
-    } 
+async def root(db: Session = Depends(get_db)):
+    try:
+        # Test database connection
+        db.execute("SELECT 1")
+        return {
+            "message": "Hello from Simplim",
+            "environment": ENVIRONMENT,
+            "version": "1.0.0",
+            "database": "connected"
+        }
+    except Exception as e:
+        return {
+            "message": "Hello from Simplim",
+            "environment": ENVIRONMENT,
+            "version": "1.0.0",
+            "database": "disconnected",
+            "error": str(e)
+        }
