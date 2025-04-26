@@ -4,6 +4,11 @@ from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
 import os
 import urllib.parse
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
@@ -11,56 +16,71 @@ load_dotenv()
 # Get environment
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 
-# Get MySQL connection parameters
-if ENVIRONMENT == "production":
-    # Use internal URL for Railway deployment
-    MYSQL_USER = os.getenv("MYSQLUSER")
-    MYSQL_PASSWORD = os.getenv("MYSQLPASSWORD")
-    MYSQL_HOST = os.getenv("MYSQLHOST")
-    MYSQL_PORT = os.getenv("MYSQLPORT")
-    MYSQL_DATABASE = os.getenv("MYSQL_DATABASE")
-else:
-    # Use public URL for local development
-    MYSQL_PUBLIC_URL = os.getenv("MYSQL_PUBLIC_URL")
-    if not MYSQL_PUBLIC_URL:
-        raise ValueError("MYSQL_PUBLIC_URL environment variable is not set")
-    
-    # Parse the public URL
-    parsed_url = urllib.parse.urlparse(MYSQL_PUBLIC_URL)
-    MYSQL_USER = parsed_url.username
-    MYSQL_PASSWORD = parsed_url.password
-    MYSQL_HOST = parsed_url.hostname
-    MYSQL_PORT = parsed_url.port or 3306
-    MYSQL_DATABASE = parsed_url.path.lstrip('/')
+# Initialize engine as None
+engine = None
+SessionLocal = None
 
-# Create SQLAlchemy URL
-SQLALCHEMY_DATABASE_URL = f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}"
+def get_db_url():
+    """Get database URL based on environment"""
+    try:
+        if ENVIRONMENT == "production":
+            # Use internal URL for Railway deployment
+            MYSQL_USER = os.getenv("MYSQLUSER")
+            MYSQL_PASSWORD = os.getenv("MYSQLPASSWORD")
+            MYSQL_HOST = os.getenv("MYSQLHOST")
+            MYSQL_PORT = os.getenv("MYSQLPORT")
+            MYSQL_DATABASE = os.getenv("MYSQL_DATABASE")
+            
+            if not all([MYSQL_USER, MYSQL_PASSWORD, MYSQL_HOST, MYSQL_PORT, MYSQL_DATABASE]):
+                raise ValueError("Missing required MySQL environment variables")
+                
+            return f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}"
+        else:
+            # Use public URL for local development
+            MYSQL_PUBLIC_URL = os.getenv("MYSQL_PUBLIC_URL")
+            if not MYSQL_PUBLIC_URL:
+                raise ValueError("MYSQL_PUBLIC_URL environment variable is not set")
+            
+            return MYSQL_PUBLIC_URL
+    except Exception as e:
+        logger.error(f"Error getting database URL: {str(e)}")
+        raise
 
-print(f"Connecting to database at: {MYSQL_HOST}:{MYSQL_PORT}")  # For debugging
-print(f"Environment: {ENVIRONMENT}")  # For debugging
+def init_db():
+    """Initialize database connection"""
+    global engine, SessionLocal
+    try:
+        if engine is None:
+            db_url = get_db_url()
+            logger.info(f"Initializing database connection to: {db_url}")
+            
+            engine = create_engine(
+                db_url,
+                pool_pre_ping=True,
+                pool_recycle=3600,
+                pool_size=5,
+                max_overflow=10,
+                echo=False,  # Set to False in production
+                connect_args={
+                    "connect_timeout": 10
+                }
+            )
+            SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+            logger.info("Database connection initialized successfully")
+    except Exception as e:
+        logger.error(f"Error initializing database: {str(e)}")
+        raise
 
-# Create engine with Railway-specific settings
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    pool_pre_ping=True,  # Enable connection health checks
-    pool_recycle=3600,   # Recycle connections after 1 hour
-    pool_size=5,         # Maximum number of connections to keep open
-    max_overflow=10,     # Maximum number of connections to create above pool_size
-    echo=True,          # Set to True for debugging SQL queries
-    connect_args={
-        "connect_timeout": 10,  # 10 second timeout
-        "ssl": {"verify_cert": False}  # Disable SSL verification for internal connections
-    }
-)
-
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-Base = declarative_base()
-
-# Dependency
 def get_db():
+    """Get database session"""
+    if SessionLocal is None:
+        init_db()
+    
     db = SessionLocal()
     try:
         yield db
     finally:
-        db.close() 
+        db.close()
+
+# Create Base for models
+Base = declarative_base() 
