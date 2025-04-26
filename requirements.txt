@@ -20,4 +20,9 @@ autogen-ext[openai]
 tenacity==8.2.3
 mysqlclient==2.2.7
 SQLAlchemy==2.0.27
-PyMySQL==1.1.0 
+PyMySQL==1.1.0
+python-magic==0.4.27
+aiofiles==23.2.1
+python-jose[cryptography]==3.3.0
+python-multipart==0.0.9
+passlib[bcrypt]==1.7.4 
