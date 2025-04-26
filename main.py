@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from dotenv import load_dotenv
+from routers import auth
 
 # Load environment variables
 load_dotenv()
@@ -26,10 +27,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Include routers
+app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
+
 @app.get("/")
 async def root():
     return {
         "message": "Hello from Simplim",
         "environment": ENVIRONMENT,
         "version": "1.0.0"
+    }
+
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "service": "simplim_back",
+        "environment": ENVIRONMENT
     } 
