@@ -6,6 +6,7 @@ from database.database import get_db, init_db
 from sqlalchemy.orm import Session
 from database.models import User
 import logging
+from datetime import datetime
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -44,12 +45,12 @@ async def startup_event():
 
 @app.get("/")
 async def root():
-    """Simple health check endpoint"""
+    """Health check endpoint"""
     return {
-        "message": "Hello from Simplim",
+        "status": "ok",
+        "message": "Simplim API is running",
         "environment": ENVIRONMENT,
-        "version": "1.0.0",
-        "status": "healthy"
+        "timestamp": datetime.utcnow().isoformat()
     }
 
 @app.get("/db-status")
