@@ -2,12 +2,10 @@ from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from dotenv import load_dotenv
-from database.database import get_db, init_db, engine, Base
+from database.database import get_db, init_db
 from sqlalchemy.orm import Session
 from database.models import User
 import logging
-from routers import auth
-from datetime import datetime
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -18,15 +16,6 @@ load_dotenv()
 
 # Get environment variables
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
-
-# Initialize database and create tables
-try:
-    init_db()
-    Base.metadata.create_all(bind=engine)
-    logger.info("Database tables created successfully")
-except Exception as e:
-    logger.error(f"Error during database initialization: {str(e)}")
-    # Don't raise the exception, let the app start without database
 
 app = FastAPI(
     title="Simplim Backend",
@@ -43,9 +32,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
-app.include_router(auth.router, prefix="/auth", tags=["authentication"])
-
 @app.on_event("startup")
 async def startup_event():
     """Initialize database connection on startup"""
@@ -58,20 +44,12 @@ async def startup_event():
 
 @app.get("/")
 async def root():
-    """Root endpoint that returns basic application information"""
+    """Simple health check endpoint"""
     return {
-        "message": "Welcome to Simplim API",
-        "status": "ok",
+        "message": "Hello from Simplim",
+        "environment": ENVIRONMENT,
         "version": "1.0.0",
-        "timestamp": datetime.utcnow().isoformat()
-    }
-
-@app.get("/health")
-async def health_check():
-    """Health check endpoint for Railway"""
-    return {
-        "status": "ok",
-        "timestamp": datetime.utcnow().isoformat()
+        "status": "healthy"
     }
 
 @app.get("/db-status")
