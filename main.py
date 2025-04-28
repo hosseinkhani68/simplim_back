@@ -8,6 +8,7 @@ from database.models import User
 import logging
 from datetime import datetime
 from sqlalchemy import text
+from routers import auth
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -25,6 +26,9 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
+# Include routers
+app.include_router(auth.router, prefix="/auth", tags=["authentication"])
 
 app.add_middleware(
     CORSMiddleware,
