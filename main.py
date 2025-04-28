@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from database.models import User
 import logging
 from datetime import datetime
+from sqlalchemy import text
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -57,8 +58,8 @@ async def root():
 async def db_status(db: Session = Depends(get_db)):
     """Check database connection status"""
     try:
-        # First check if the users table exists
-        table_exists = db.execute("SHOW TABLES LIKE 'users'").first()
+        # First check if the users table exists using proper SQLAlchemy text()
+        table_exists = db.execute(text("SHOW TABLES LIKE 'users'")).first()
         if not table_exists:
             return {
                 "status": "disconnected",
