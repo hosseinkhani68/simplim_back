@@ -57,6 +57,14 @@ async def root():
 async def db_status(db: Session = Depends(get_db)):
     """Check database connection status"""
     try:
+        # First check if the users table exists
+        table_exists = db.execute("SHOW TABLES LIKE 'users'").first()
+        if not table_exists:
+            return {
+                "status": "disconnected",
+                "message": "Database table 'users' does not exist"
+            }
+        
         # Test database connection by querying User table
         user_count = db.query(User).count()
         return {
