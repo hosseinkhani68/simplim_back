@@ -35,30 +35,41 @@ class Token(BaseModel):
     access_token: str
     token_type: str
 
-@router.post("/register", response_model=UserResponse)
+@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register(user: UserCreate, db: Session = Depends(get_db)):
-    # Check if username or email already exists
-    db_user = db.query(User).filter(
-        (User.username == user.username) | (User.email == user.email)
-    ).first()
-    if db_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username or email already registered"
+    """Register a new user"""
+    try:
+        # Check if username or email already exists
+        db_user = db.query(User).filter(
+            (User.username == user.username) | (User.email == user.email)
+        ).first()
+        if db_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Username or email already registered"
+            )
+        
+        # Create new user
+        hashed_password = get_password_hash(user.password)
+        db_user = User(
+            username=user.username,
+            email=user.email,
+            hashed_password=hashed_password,
+            is_active=True
         )
-    
-    # Create new user
-    hashed_password = get_password_hash(user.password)
-    db_user = User(
-        username=user.username,
-        email=user.email,
-        hashed_password=hashed_password,
-        is_active=True
-    )
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    return db_user
+        
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
+        return db_user
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error creating user: {str(e)}"
+        )
 
 @router.post("/login", response_model=Token)
 async def login(
