@@ -82,4 +82,71 @@ async def db_status(db: Session = Depends(get_db)):
         return {
             "status": "disconnected",
             "error": str(e)
+        }
+
+@app.get("/monitor/db")
+async def monitor_db(db: Session = Depends(get_db)):
+    """Monitor database health and performance"""
+    try:
+        # Check basic connection
+        connection_check = db.execute(text("SELECT 1")).scalar()
+        
+        # Get database status
+        db_status = db.execute(text("SHOW STATUS LIKE 'Threads_connected'")).first()
+        threads_connected = db_status[1] if db_status else 0
+        
+        # Get table sizes
+        table_sizes = db.execute(text("""
+            SELECT table_name, table_rows, data_length, index_length 
+            FROM information_schema.tables 
+            WHERE table_schema = DATABASE()
+        """)).fetchall()
+        
+        # Format table sizes
+        tables = []
+        for table in table_sizes:
+            tables.append({
+                "name": table[0],
+                "rows": table[1],
+                "size_mb": round((table[2] + table[3]) / 1024 / 1024, 2)
+            })
+        
+        return {
+            "status": "healthy",
+            "connection": "active",
+            "threads_connected": threads_connected,
+            "tables": tables,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Database monitoring failed: {str(e)}")
+        return {
+            "status": "unhealthy",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+@app.get("/health")
+async def health_check(db: Session = Depends(get_db)):
+    """Comprehensive health check endpoint"""
+    try:
+        # Check database connection
+        db_check = db.execute(text("SELECT 1")).scalar()
+        
+        # Get application info
+        app_info = {
+            "status": "healthy",
+            "version": "1.0.0",
+            "environment": ENVIRONMENT,
+            "database": "connected",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+        return app_info
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        return {
+            "status": "unhealthy",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
         } 
