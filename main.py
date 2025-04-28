@@ -95,6 +95,9 @@ async def monitor_db(db: Session = Depends(get_db)):
         db_status = db.execute(text("SHOW STATUS LIKE 'Threads_connected'")).first()
         threads_connected = db_status[1] if db_status else 0
         
+        # Get direct user count
+        user_count = db.execute(text("SELECT COUNT(*) FROM users")).scalar()
+        
         # Get table sizes
         table_sizes = db.execute(text("""
             SELECT table_name, table_rows, data_length, index_length 
@@ -115,6 +118,7 @@ async def monitor_db(db: Session = Depends(get_db)):
             "status": "healthy",
             "connection": "active",
             "threads_connected": threads_connected,
+            "user_count": user_count,
             "tables": tables,
             "timestamp": datetime.utcnow().isoformat()
         }
@@ -147,6 +151,33 @@ async def health_check(db: Session = Depends(get_db)):
         logger.error(f"Health check failed: {str(e)}")
         return {
             "status": "unhealthy",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+@app.get("/monitor/users")
+async def monitor_users(db: Session = Depends(get_db)):
+    """List all users in the database"""
+    try:
+        users = db.execute(text("SELECT id, username, email, created_at FROM users")).fetchall()
+        return {
+            "status": "success",
+            "count": len(users),
+            "users": [
+                {
+                    "id": user[0],
+                    "username": user[1],
+                    "email": user[2],
+                    "created_at": user[3].isoformat() if user[3] else None
+                }
+                for user in users
+            ],
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Error fetching users: {str(e)}")
+        return {
+            "status": "error",
             "error": str(e),
             "timestamp": datetime.utcnow().isoformat()
         } 
