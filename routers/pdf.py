@@ -2,22 +2,31 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List
 import os
-import shutil
+import boto3
 from datetime import datetime
 from models.user import PDFDocument, PDFDocumentCreate
 from database.database import get_db
-from database.models import PDFDocument as DBPDFDocument
+from database.models import PDFDocument as DBPDFDocument, User as DBUser
 from routers.auth import oauth2_scheme
 from jose import jwt
 from utils.auth_utils import SECRET_KEY, ALGORITHM
 import magic
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Initialize S3 client
+s3_client = boto3.client(
+    's3',
+    aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+    aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
+    region_name=os.getenv('AWS_REGION', 'us-east-1')
+)
+
+BUCKET_NAME = os.getenv('AWS_BUCKET_NAME')
 
 router = APIRouter()
-
-# Create uploads directory if it doesn't exist
-UPLOAD_DIR = "uploads"
-if not os.path.exists(UPLOAD_DIR):
-    os.makedirs(UPLOAD_DIR)
 
 @router.post("/upload", response_model=PDFDocument)
 async def upload_pdf(
@@ -38,24 +47,26 @@ async def upload_pdf(
         if not file.filename.endswith('.pdf'):
             raise HTTPException(status_code=400, detail="Only PDF files are allowed")
 
-        # Create user-specific directory
-        user_dir = os.path.join(UPLOAD_DIR, str(user.id))
-        if not os.path.exists(user_dir):
-            os.makedirs(user_dir)
+        # Create S3 key (path) for the file
+        s3_key = f"users/{user.id}/{file.filename}"
 
-        # Save file
-        file_path = os.path.join(user_dir, file.filename)
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        # Upload to S3
+        file_content = await file.read()
+        s3_client.put_object(
+            Bucket=BUCKET_NAME,
+            Key=s3_key,
+            Body=file_content,
+            ContentType='application/pdf'
+        )
 
         # Get file size
-        file_size = os.path.getsize(file_path)
+        file_size = len(file_content)
 
         # Create database entry
         db_pdf = DBPDFDocument(
             user_id=user.id,
             filename=file.filename,
-            file_path=file_path,
+            file_path=s3_key,  # Store S3 key instead of local path
             size=file_size
         )
         db.add(db_pdf)
@@ -115,9 +126,11 @@ async def delete_pdf(
         if not pdf:
             raise HTTPException(status_code=404, detail="PDF not found")
 
-        # Delete file
-        if os.path.exists(pdf.file_path):
-            os.remove(pdf.file_path)
+        # Delete from S3
+        s3_client.delete_object(
+            Bucket=BUCKET_NAME,
+            Key=pdf.file_path
+        )
 
         # Delete database entry
         db.delete(pdf)
