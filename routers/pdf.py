@@ -4,7 +4,7 @@ from typing import List
 import os
 from datetime import datetime
 import logging
-from services.supabase_storage_service import SupabaseStorageService
+# from services.supabase_storage_service import SupabaseStorageService
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Initialize storage service
-storage_service = SupabaseStorageService()
+# storage_service = SupabaseStorageService()
 
 # Add a test endpoint
 @router.get("/test")
