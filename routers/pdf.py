@@ -15,11 +15,10 @@ import magic
 router = APIRouter()
 
 # Create uploads directory if it doesn't exist
-UPLOAD_DIR = "uploads"
-if not os.path.exists(UPLOAD_DIR):
-    os.makedirs(UPLOAD_DIR)
+UPLOAD_DIR = os.path.join(os.getcwd(), "uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-@router.post("/upload", response_model=PDFDocument)
+@router.post("/upload")
 async def upload_pdf(
     file: UploadFile = File(...),
     token: str = Depends(oauth2_scheme),
@@ -40,8 +39,7 @@ async def upload_pdf(
 
         # Create user-specific directory
         user_dir = os.path.join(UPLOAD_DIR, str(user.id))
-        if not os.path.exists(user_dir):
-            os.makedirs(user_dir)
+        os.makedirs(user_dir, exist_ok=True)
 
         # Save file
         file_path = os.path.join(user_dir, file.filename)
@@ -62,7 +60,12 @@ async def upload_pdf(
         db.commit()
         db.refresh(db_pdf)
 
-        return db_pdf
+        return {
+            "id": db_pdf.id,
+            "filename": db_pdf.filename,
+            "size": db_pdf.size,
+            "upload_date": db_pdf.upload_date
+        }
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
