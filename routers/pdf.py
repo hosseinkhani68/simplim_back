@@ -25,6 +25,12 @@ except ImportError as e:
 
 router = APIRouter()
 
+# Add a test endpoint
+@router.get("/test")
+async def test_pdf():
+    """Test endpoint to verify PDF router is working"""
+    return {"message": "PDF router is working"}
+
 # Use /tmp for uploads in Railway environment
 UPLOAD_DIR = "/tmp/uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
