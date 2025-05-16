@@ -83,6 +83,7 @@ async def health_check():
         logger.error(f"Database health check failed: {str(e)}")
         health_status["services"]["database"] = "unhealthy"
         health_status["status"] = "unhealthy"
+        health_status["database_error"] = str(e)
     
     try:
         # Check Supabase storage
@@ -91,7 +92,8 @@ async def health_check():
         health_status["services"]["storage"] = "healthy"
         health_status["storage"] = {
             "bucket": storage_service.bucket_name,
-            "connected": True
+            "connected": True,
+            "url": storage_service.supabase_url
         }
     except Exception as e:
         logger.error(f"Storage health check failed: {str(e)}")
@@ -100,6 +102,7 @@ async def health_check():
         health_status["storage"] = {
             "bucket": storage_service.bucket_name,
             "connected": False,
+            "url": storage_service.supabase_url,
             "error": str(e)
         }
     
@@ -120,6 +123,10 @@ async def startup_event():
             logger.info("Supabase storage service initialized successfully")
         except Exception as e:
             logger.error(f"Storage service initialization failed: {str(e)}")
+            # Log environment variables (without sensitive data)
+            logger.info(f"SUPABASE_URL is set: {bool(os.getenv('SUPABASE_URL'))}")
+            logger.info(f"SUPABASE_KEY is set: {bool(os.getenv('SUPABASE_KEY'))}")
+            logger.info(f"SUPABASE_BUCKET_NAME: {os.getenv('SUPABASE_BUCKET_NAME', 'pdfs')}")
             # Don't raise the exception, let the app start without storage
             
     except Exception as e:

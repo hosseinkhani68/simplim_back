@@ -6,20 +6,41 @@ from typing import Optional, List, Dict
 from fastapi import UploadFile
 import mimetypes
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class SupabaseStorageService:
     def __init__(self):
-        # Initialize Supabase client
-        self.supabase_url = os.getenv('SUPABASE_URL')
-        self.supabase_key = os.getenv('SUPABASE_KEY')
-        self.bucket_name = os.getenv('SUPABASE_BUCKET_NAME', 'pdfs')
-        
-        if not self.supabase_url or not self.supabase_key:
-            raise ValueError("Supabase URL and key must be set in environment variables")
+        try:
+            # Initialize Supabase client
+            self.supabase_url = os.getenv('SUPABASE_URL')
+            self.supabase_key = os.getenv('SUPABASE_KEY')
+            self.bucket_name = os.getenv('SUPABASE_BUCKET_NAME', 'pdfs')
             
-        self.client: Client = create_client(self.supabase_url, self.supabase_key)
-        logger.info(f"Supabase storage service initialized with bucket: {self.bucket_name}")
+            # Log configuration (without sensitive data)
+            logger.info(f"Initializing Supabase storage service with URL: {self.supabase_url}")
+            logger.info(f"Using bucket: {self.bucket_name}")
+            
+            if not self.supabase_url or not self.supabase_key:
+                error_msg = "Supabase URL and key must be set in environment variables"
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+                
+            # Test connection
+            self.client: Client = create_client(self.supabase_url, self.supabase_key)
+            
+            # Verify bucket exists
+            try:
+                self.client.storage.get_bucket(self.bucket_name)
+                logger.info(f"Successfully connected to Supabase and verified bucket: {self.bucket_name}")
+            except Exception as e:
+                logger.error(f"Failed to verify bucket existence: {str(e)}")
+                raise
+                
+        except Exception as e:
+            logger.error(f"Failed to initialize Supabase storage service: {str(e)}")
+            raise
         
     async def upload_file(self, file: UploadFile, user_id: int) -> Optional[dict]:
         """
@@ -98,7 +119,10 @@ class SupabaseStorageService:
         """
         try:
             prefix = f"users/{user_id}/"
+            logger.info(f"Listing files for user {user_id} with prefix: {prefix}")
+            
             response = self.client.storage.from_(self.bucket_name).list(prefix)
+            logger.info(f"Successfully listed files for user {user_id}")
             
             files = []
             for item in response:
@@ -114,7 +138,7 @@ class SupabaseStorageService:
             
         except Exception as e:
             logger.error(f"Error listing user files from Supabase: {str(e)}")
-            return []
+            raise  # Re-raise the exception to be handled by the caller
             
     async def get_file_metadata(self, filename: str, user_id: int) -> Optional[dict]:
         """
