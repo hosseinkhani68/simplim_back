@@ -4,7 +4,7 @@ from typing import List
 import os
 from datetime import datetime
 import logging
-from services.local_storage_service import LocalStorageService
+from services.supabase_storage_service import SupabaseStorageService
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -13,7 +13,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Initialize storage service
-storage_service = LocalStorageService()
+storage_service = SupabaseStorageService()
+
+# Add a test endpoint
+@router.get("/test")
+async def test_pdf():
+    """Test endpoint to verify PDF router is working"""
+    return {"message": "PDF router is working"}
 
 # Import dependencies
 from database.database import get_db
@@ -50,7 +56,7 @@ async def upload_pdf(
         db_pdf = DBPDFDocument(
             user_id=user.id,
             filename=file_info["filename"],
-            file_path=file_info["path"],
+            file_path=file_info["url"],  # Store Supabase URL
             size=file_info["size"]
         )
         db.add(db_pdf)
@@ -63,6 +69,7 @@ async def upload_pdf(
             "filename": db_pdf.filename,
             "size": db_pdf.size,
             "upload_date": db_pdf.upload_date,
+            "url": file_info["url"],
             "original_name": file_info["original_name"]
         }
 
@@ -102,7 +109,7 @@ async def list_pdfs(
                     "filename": db_pdf.filename,
                     "size": db_pdf.size,
                     "upload_date": db_pdf.upload_date,
-                    "path": file_info["path"]
+                    "url": file_info["url"]
                 })
 
         return pdf_list

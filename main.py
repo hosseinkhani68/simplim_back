@@ -8,8 +8,8 @@ from database.models import User
 import logging
 from datetime import datetime
 from sqlalchemy import text
-from routers import auth  # Import pdf directly
-from services.local_storage_service import LocalStorageService
+from routers import auth, pdf
+from services.supabase_storage_service import SupabaseStorageService
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -21,7 +21,6 @@ load_dotenv()
 # Get environment variables
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 PORT = os.getenv("PORT", "8000")
-UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/app/uploads")
 
 app = FastAPI(
     title="Simplim Backend",
@@ -31,11 +30,11 @@ app = FastAPI(
 )
 
 # Initialize storage service
-storage_service = LocalStorageService()
+storage_service = SupabaseStorageService()
 
 # Include routers
 app.include_router(auth.router, prefix="/auth", tags=["authentication"])
-# app.include_router(pdf.router, prefix="/pdf", tags=["pdf"])
+app.include_router(pdf.router, prefix="/pdf", tags=["pdf"])
 logger.info("Routers included successfully")
 
 # Log all registered routes
@@ -86,40 +85,21 @@ async def health_check():
         health_status["status"] = "unhealthy"
     
     try:
-        # Check storage service
-        # Create a test directory
-        test_dir = os.path.join(UPLOAD_DIR, "health_check")
-        os.makedirs(test_dir, exist_ok=True)
-        
-        # Try to write a test file
-        test_file = os.path.join(test_dir, "test.txt")
-        with open(test_file, "w") as f:
-            f.write("test")
-        
-        # Try to read the test file
-        with open(test_file, "r") as f:
-            content = f.read()
-            if content != "test":
-                raise Exception("File content mismatch")
-        
-        # Clean up
-        os.remove(test_file)
-        os.rmdir(test_dir)
-        
+        # Check Supabase storage
+        # Try to list files in the bucket
+        files = await storage_service.list_user_files(0)  # Test with user_id 0
         health_status["services"]["storage"] = "healthy"
         health_status["storage"] = {
-            "upload_dir": UPLOAD_DIR,
-            "writable": True,
-            "readable": True
+            "bucket": storage_service.bucket_name,
+            "connected": True
         }
     except Exception as e:
         logger.error(f"Storage health check failed: {str(e)}")
         health_status["services"]["storage"] = "unhealthy"
         health_status["status"] = "unhealthy"
         health_status["storage"] = {
-            "upload_dir": UPLOAD_DIR,
-            "writable": False,
-            "readable": False,
+            "bucket": storage_service.bucket_name,
+            "connected": False,
             "error": str(e)
         }
     
@@ -135,29 +115,9 @@ async def startup_event():
         
         # Initialize storage service
         try:
-            # Create base upload directory
-            os.makedirs(UPLOAD_DIR, exist_ok=True)
-            logger.info(f"Upload directory initialized: {UPLOAD_DIR}")
-            
-            # Test write permissions
-            test_dir = os.path.join(UPLOAD_DIR, "startup_test")
-            os.makedirs(test_dir, exist_ok=True)
-            
-            test_file = os.path.join(test_dir, "test.txt")
-            with open(test_file, "w") as f:
-                f.write("test")
-            
-            # Test read permissions
-            with open(test_file, "r") as f:
-                content = f.read()
-                if content != "test":
-                    raise Exception("File content mismatch")
-            
-            # Clean up
-            os.remove(test_file)
-            os.rmdir(test_dir)
-            
-            logger.info("Storage service initialized successfully")
+            # Test Supabase connection
+            await storage_service.list_user_files(0)  # Test with user_id 0
+            logger.info("Supabase storage service initialized successfully")
         except Exception as e:
             logger.error(f"Storage service initialization failed: {str(e)}")
             # Don't raise the exception, let the app start without storage
