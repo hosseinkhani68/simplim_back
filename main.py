@@ -9,7 +9,7 @@ import logging
 from datetime import datetime
 from sqlalchemy import text
 from routers import auth, pdf
-# from services.supabase_storage_service import SupabaseStorageService
+from services.supabase_storage_service import SupabaseStorageService
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
