@@ -30,7 +30,6 @@ app = FastAPI(
 # Include routers
 app.include_router(auth.router, prefix="/auth", tags=["authentication"])
 
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -177,32 +176,6 @@ async def monitor_users(db: Session = Depends(get_db)):
         }
     except Exception as e:
         logger.error(f"Error fetching users: {str(e)}")
-        return {
-            "status": "error",
-            "error": str(e),
-            "timestamp": datetime.utcnow().isoformat()
-        }
-
-@app.delete("/admin/delete-all-users")
-async def delete_all_users(db: Session = Depends(get_db)):
-    """Delete all users from the database (Admin only)"""
-    try:
-        # First get count of users
-        user_count = db.query(User).count()
-        
-        # Delete all users
-        db.query(User).delete()
-        db.commit()
-        
-        return {
-            "status": "success",
-            "message": f"Successfully deleted {user_count} users",
-            "deleted_count": user_count,
-            "timestamp": datetime.utcnow().isoformat()
-        }
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Error deleting users: {str(e)}")
         return {
             "status": "error",
             "error": str(e),
