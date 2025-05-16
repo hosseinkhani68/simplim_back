@@ -8,7 +8,7 @@ from database.models import User
 import logging
 from datetime import datetime
 from sqlalchemy import text
-from routers import auth, pdf
+from routers import auth
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -29,7 +29,15 @@ app = FastAPI(
 
 # Include routers
 app.include_router(auth.router, prefix="/auth", tags=["authentication"])
-app.include_router(pdf.router, prefix="/pdf", tags=["pdf"])
+
+# Try to include PDF router, but don't fail if it doesn't work
+try:
+    from routers import pdf
+    app.include_router(pdf.router, prefix="/pdf", tags=["pdf"])
+    logger.info("PDF router included successfully")
+except Exception as e:
+    logger.error(f"Error including PDF router: {str(e)}")
+    # Don't raise the exception, let the app start without PDF functionality
 
 app.add_middleware(
     CORSMiddleware,
@@ -52,12 +60,21 @@ async def startup_event():
 @app.get("/")
 async def root():
     """Health check endpoint"""
-    return {
-        "status": "ok",
-        "message": "Simplim API is running",
-        "environment": ENVIRONMENT,
-        "timestamp": datetime.utcnow().isoformat()
-    }
+    try:
+        return {
+            "status": "ok",
+            "message": "Simplim API is running",
+            "environment": ENVIRONMENT,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Error in root endpoint: {str(e)}")
+        return {
+            "status": "error",
+            "message": "API is running but encountered an error",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
+        }
 
 @app.get("/db-status")
 async def db_status(db: Session = Depends(get_db)):

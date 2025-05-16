@@ -10,12 +10,23 @@ from database.models import PDFDocument as DBPDFDocument, User as DBUser
 from routers.auth import oauth2_scheme
 from jose import jwt
 from utils.auth_utils import SECRET_KEY, ALGORITHM
+import logging
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 # Create uploads directory if it doesn't exist
-UPLOAD_DIR = os.path.join(os.getcwd(), "uploads")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+try:
+    UPLOAD_DIR = os.path.join(os.getcwd(), "uploads")
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    logger.info(f"Upload directory created at: {UPLOAD_DIR}")
+except Exception as e:
+    logger.error(f"Error creating upload directory: {str(e)}")
+    UPLOAD_DIR = "/tmp/uploads"  # Fallback to /tmp if main directory fails
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    logger.info(f"Using fallback upload directory: {UPLOAD_DIR}")
 
 @router.post("/upload")
 async def upload_pdf(
@@ -37,27 +48,48 @@ async def upload_pdf(
             raise HTTPException(status_code=400, detail="Only PDF files are allowed")
 
         # Create user-specific directory
-        user_dir = os.path.join(UPLOAD_DIR, str(user.id))
-        os.makedirs(user_dir, exist_ok=True)
+        try:
+            user_dir = os.path.join(UPLOAD_DIR, str(user.id))
+            os.makedirs(user_dir, exist_ok=True)
+        except Exception as e:
+            logger.error(f"Error creating user directory: {str(e)}")
+            raise HTTPException(status_code=500, detail="Error creating upload directory")
 
         # Save file
-        file_path = os.path.join(user_dir, file.filename)
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        try:
+            file_path = os.path.join(user_dir, file.filename)
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+        except Exception as e:
+            logger.error(f"Error saving file: {str(e)}")
+            raise HTTPException(status_code=500, detail="Error saving file")
 
         # Get file size
-        file_size = os.path.getsize(file_path)
+        try:
+            file_size = os.path.getsize(file_path)
+        except Exception as e:
+            logger.error(f"Error getting file size: {str(e)}")
+            file_size = 0
 
         # Create database entry
-        db_pdf = DBPDFDocument(
-            user_id=user.id,
-            filename=file.filename,
-            file_path=file_path,
-            size=file_size
-        )
-        db.add(db_pdf)
-        db.commit()
-        db.refresh(db_pdf)
+        try:
+            db_pdf = DBPDFDocument(
+                user_id=user.id,
+                filename=file.filename,
+                file_path=file_path,
+                size=file_size
+            )
+            db.add(db_pdf)
+            db.commit()
+            db.refresh(db_pdf)
+        except Exception as e:
+            logger.error(f"Error creating database entry: {str(e)}")
+            # Try to clean up the file if database entry fails
+            try:
+                os.remove(file_path)
+            except:
+                pass
+            raise HTTPException(status_code=500, detail="Error saving file information")
 
         return {
             "id": db_pdf.id,
@@ -66,8 +98,11 @@ async def upload_pdf(
             "upload_date": db_pdf.upload_date
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Unexpected error in upload_pdf: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/list", response_model=List[PDFDocument])
 async def list_pdfs(
