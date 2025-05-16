@@ -27,10 +27,7 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# Include routers
-app.include_router(auth.router, prefix="/auth", tags=["authentication"])
-app.include_router(pdf.router, prefix="/pdf", tags=["pdf"])
-
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -52,12 +49,20 @@ async def startup_event():
 @app.get("/")
 async def root():
     """Health check endpoint"""
-    return {
-        "status": "ok",
-        "message": "Simplim API is running",
-        "environment": ENVIRONMENT,
-        "timestamp": datetime.utcnow().isoformat()
-    }
+    try:
+        return {
+            "status": "ok",
+            "message": "Simplim API is running",
+            "environment": ENVIRONMENT,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Root endpoint error: {str(e)}")
+        return {
+            "status": "ok",
+            "message": "Simplim API is running",
+            "error": str(e)
+        }
 
 @app.get("/db-status")
 async def db_status(db: Session = Depends(get_db)):
@@ -181,4 +186,8 @@ async def monitor_users(db: Session = Depends(get_db)):
             "status": "error",
             "error": str(e),
             "timestamp": datetime.utcnow().isoformat()
-        } 
+        }
+
+# Include routers after all the basic endpoints
+app.include_router(auth.router, prefix="/auth", tags=["authentication"])
+app.include_router(pdf.router, prefix="/pdf", tags=["pdf"])
