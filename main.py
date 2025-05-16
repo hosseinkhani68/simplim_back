@@ -29,7 +29,7 @@ app = FastAPI(
 
 # Include routers
 app.include_router(auth.router, prefix="/auth", tags=["authentication"])
-app.include_router(pdf.router, prefix="/pdf", tags=["pdf"])
+# app.include_router(pdf.router, prefix="/pdf", tags=["pdf"])
 
 app.add_middleware(
     CORSMiddleware,
