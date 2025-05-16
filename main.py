@@ -35,7 +35,7 @@ app.add_middleware(
 
 # Include routers immediately
 app.include_router(auth.router, prefix="/auth", tags=["authentication"])
-app.include_router(pdf.router, prefix="/pdf", tags=["pdf"])
+# app.include_router(pdf.router, prefix="/pdf", tags=["pdf"])
 logger.info("Routers included successfully")
 
 @app.get("/")
