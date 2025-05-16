@@ -5,38 +5,28 @@ import os
 import shutil
 from datetime import datetime
 import logging
-import sys
 
 # Configure logging
 logger = logging.getLogger(__name__)
-logger.info(f"Python path in pdf.py: {sys.path}")
-logger.info(f"Current working directory in pdf.py: {os.getcwd()}")
 
-# Create router first
+# Create router
 router = APIRouter()
 
-# Add a test endpoint that doesn't depend on any imports
+# Add a test endpoint
 @router.get("/test")
 async def test_pdf():
     """Test endpoint to verify PDF router is working"""
     return {"message": "PDF router is working"}
 
-# Now try to import dependencies
-try:
-    from database.database import get_db
-    from database.models import PDFDocument as DBPDFDocument, User as DBUser
-    from routers.auth import oauth2_scheme
-    from jose import jwt
-    from utils.auth_utils import SECRET_KEY, ALGORITHM
-    logger.info("All imports successful in pdf.py")
-except ImportError as e:
-    logger.error(f"Import error in pdf.py: {str(e)}")
-    # Don't raise the exception, let the router continue with basic functionality
+# Import dependencies
+from database.database import get_db
+from database.models import PDFDocument as DBPDFDocument, User as DBUser
+from routers.auth import oauth2_scheme
+from jose import jwt
+from utils.auth_utils import SECRET_KEY, ALGORITHM
 
 # Use /tmp for uploads in Railway environment
 UPLOAD_DIR = "/tmp/uploads"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-logger.info(f"Using upload directory: {UPLOAD_DIR}")
 
 @router.post("/upload")
 async def upload_pdf(
