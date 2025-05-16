@@ -30,7 +30,7 @@ app = FastAPI(
 )
 
 # Initialize storage service
-# storage_service = SupabaseStorageService()
+storage_service = SupabaseStorageService()
 
 # Include routers
 app.include_router(auth.router, prefix="/auth", tags=["authentication"])
@@ -87,21 +87,21 @@ async def health_check():
     try:
         # Check Supabase storage
         # Try to list files in the bucket
-        # files = await storage_service.list_user_files(0)  # Test with user_id 0
+        files = await storage_service.list_user_files(0)  # Test with user_id 0
         health_status["services"]["storage"] = "healthy"
-        # health_status["storage"] = {
-        #     "bucket": storage_service.bucket_name,
-        #     "connected": True
-        # }
+        health_status["storage"] = {
+            "bucket": storage_service.bucket_name,
+            "connected": True
+        }
     except Exception as e:
         logger.error(f"Storage health check failed: {str(e)}")
         health_status["services"]["storage"] = "unhealthy"
         health_status["status"] = "unhealthy"
-        # health_status["storage"] = {
-        #     "bucket": storage_service.bucket_name,
-        #     "connected": False,
-        #     "error": str(e)
-        # }
+        health_status["storage"] = {
+            "bucket": storage_service.bucket_name,
+            "connected": False,
+            "error": str(e)
+        }
     
     return health_status
 
@@ -116,7 +116,7 @@ async def startup_event():
         # Initialize storage service
         try:
             # Test Supabase connection
-            # await storage_service.list_user_files(0)  # Test with user_id 0
+            await storage_service.list_user_files(0)  # Test with user_id 0
             logger.info("Supabase storage service initialized successfully")
         except Exception as e:
             logger.error(f"Storage service initialization failed: {str(e)}")
