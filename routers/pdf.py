@@ -4,15 +4,24 @@ from typing import List
 import os
 import shutil
 from datetime import datetime
-from database.database import get_db
-from database.models import PDFDocument as DBPDFDocument, User as DBUser
-from routers.auth import oauth2_scheme
-from jose import jwt
-from utils.auth_utils import SECRET_KEY, ALGORITHM
 import logging
+import sys
 
 # Configure logging
 logger = logging.getLogger(__name__)
+logger.info(f"Python path in pdf.py: {sys.path}")
+logger.info(f"Current working directory in pdf.py: {os.getcwd()}")
+
+try:
+    from database.database import get_db
+    from database.models import PDFDocument as DBPDFDocument, User as DBUser
+    from routers.auth import oauth2_scheme
+    from jose import jwt
+    from utils.auth_utils import SECRET_KEY, ALGORITHM
+    logger.info("All imports successful in pdf.py")
+except ImportError as e:
+    logger.error(f"Import error in pdf.py: {str(e)}")
+    raise
 
 router = APIRouter()
 

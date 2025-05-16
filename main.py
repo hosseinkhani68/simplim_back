@@ -32,6 +32,10 @@ app.include_router(auth.router, prefix="/auth", tags=["authentication"])
 
 # Try to include PDF router, but don't fail if it doesn't work
 try:
+    logger.info("Starting PDF router import...")
+    import sys
+    logger.info(f"Python path: {sys.path}")
+    logger.info(f"Current working directory: {os.getcwd()}")
     logger.info("Attempting to import PDF router...")
     from routers import pdf
     logger.info("PDF router imported successfully")
@@ -39,9 +43,19 @@ try:
     logger.info("PDF router included successfully")
 except ImportError as e:
     logger.error(f"Failed to import PDF router: {str(e)}")
+    logger.error(f"Import error details: {type(e).__name__}: {str(e)}")
 except Exception as e:
     logger.error(f"Error including PDF router: {str(e)}")
+    logger.error(f"Error details: {type(e).__name__}: {str(e)}")
     # Don't raise the exception, let the app start without PDF functionality
+
+# Log all registered routes
+@app.on_event("startup")
+async def log_routes():
+    """Log all registered routes on startup"""
+    logger.info("Registered routes:")
+    for route in app.routes:
+        logger.info(f"Route: {route.path}, methods: {route.methods}")
 
 app.add_middleware(
     CORSMiddleware,
