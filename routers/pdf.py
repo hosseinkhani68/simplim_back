@@ -10,7 +10,6 @@ from database.models import PDFDocument as DBPDFDocument, User as DBUser
 from routers.auth import oauth2_scheme
 from jose import jwt
 from utils.auth_utils import SECRET_KEY, ALGORITHM
-import magic
 
 router = APIRouter()
 
@@ -34,7 +33,7 @@ async def upload_pdf(
             raise HTTPException(status_code=404, detail="User not found")
 
         # Validate file type
-        if not file.filename.endswith('.pdf'):
+        if not file.filename.lower().endswith('.pdf'):
             raise HTTPException(status_code=400, detail="Only PDF files are allowed")
 
         # Create user-specific directory

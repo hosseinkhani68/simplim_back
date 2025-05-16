@@ -11,6 +11,4 @@ sentence-transformers==2.5.1
 qdrant-client==1.7.0
 openai==0.28.1
 pyautogen==0.1.14
-tenacity==8.2.3
-python-magic==0.4.27
-python-magic-bin==0.4.14 
+tenacity==8.2.3 
