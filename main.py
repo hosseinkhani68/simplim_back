@@ -8,7 +8,7 @@ from database.models import User
 import logging
 from datetime import datetime
 from sqlalchemy import text
-from routers import auth, pdf
+from routers import auth
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -29,7 +29,7 @@ app = FastAPI(
 
 # Include routers
 app.include_router(auth.router, prefix="/auth", tags=["authentication"])
-# app.include_router(pdf.router, prefix="/pdf", tags=["pdf"])
+
 
 app.add_middleware(
     CORSMiddleware,
