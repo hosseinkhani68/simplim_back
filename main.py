@@ -53,6 +53,7 @@ app.add_middleware(
 async def startup_event():
     """Initialize database connection and create tables on startup"""
     try:
+        # Initialize database
         init_db()
         logger.info("Database connection initialized during startup")
         
@@ -60,33 +61,19 @@ async def startup_event():
         from database.models import User, TextHistory, PDFDocument
         logger.info("Database models imported successfully")
         
-        # Log all registered routes
-        logger.info("Registered routes:")
-        for route in app.routes:
-            logger.info(f"Route: {route.path}, methods: {route.methods}")
-            
     except Exception as e:
-        logger.error(f"Error initializing database during startup: {str(e)}")
-        # Don't raise the exception, let the app start without database
+        logger.error(f"Error during startup: {str(e)}")
+        # Don't raise the exception, let the app start
 
 @app.get("/")
 async def root():
     """Health check endpoint"""
-    try:
-        return {
-            "status": "ok",
-            "message": "Simplim API is running",
-            "environment": ENVIRONMENT,
-            "timestamp": datetime.utcnow().isoformat()
-        }
-    except Exception as e:
-        logger.error(f"Error in root endpoint: {str(e)}")
-        return {
-            "status": "error",
-            "message": "API is running but encountered an error",
-            "error": str(e),
-            "timestamp": datetime.utcnow().isoformat()
-        }
+    return {
+        "status": "ok",
+        "message": "Simplim API is running",
+        "environment": ENVIRONMENT,
+        "timestamp": datetime.utcnow().isoformat()
+    }
 
 @app.get("/db-status")
 async def db_status(db: Session = Depends(get_db)):

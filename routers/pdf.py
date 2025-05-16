@@ -43,6 +43,9 @@ async def upload_pdf(
     db: Session = Depends(get_db)
 ):
     try:
+        # Create upload directory if it doesn't exist
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+        
         # Verify user
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
@@ -56,48 +59,27 @@ async def upload_pdf(
             raise HTTPException(status_code=400, detail="Only PDF files are allowed")
 
         # Create user-specific directory
-        try:
-            user_dir = os.path.join(UPLOAD_DIR, str(user.id))
-            os.makedirs(user_dir, exist_ok=True)
-        except Exception as e:
-            logger.error(f"Error creating user directory: {str(e)}")
-            raise HTTPException(status_code=500, detail="Error creating upload directory")
+        user_dir = os.path.join(UPLOAD_DIR, str(user.id))
+        os.makedirs(user_dir, exist_ok=True)
 
         # Save file
-        try:
-            file_path = os.path.join(user_dir, file.filename)
-            with open(file_path, "wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
-        except Exception as e:
-            logger.error(f"Error saving file: {str(e)}")
-            raise HTTPException(status_code=500, detail="Error saving file")
+        file_path = os.path.join(user_dir, file.filename)
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
 
         # Get file size
-        try:
-            file_size = os.path.getsize(file_path)
-        except Exception as e:
-            logger.error(f"Error getting file size: {str(e)}")
-            file_size = 0
+        file_size = os.path.getsize(file_path)
 
         # Create database entry
-        try:
-            db_pdf = DBPDFDocument(
-                user_id=user.id,
-                filename=file.filename,
-                file_path=file_path,
-                size=file_size
-            )
-            db.add(db_pdf)
-            db.commit()
-            db.refresh(db_pdf)
-        except Exception as e:
-            logger.error(f"Error creating database entry: {str(e)}")
-            # Try to clean up the file if database entry fails
-            try:
-                os.remove(file_path)
-            except:
-                pass
-            raise HTTPException(status_code=500, detail="Error saving file information")
+        db_pdf = DBPDFDocument(
+            user_id=user.id,
+            filename=file.filename,
+            file_path=file_path,
+            size=file_size
+        )
+        db.add(db_pdf)
+        db.commit()
+        db.refresh(db_pdf)
 
         return {
             "id": db_pdf.id,
@@ -106,11 +88,9 @@ async def upload_pdf(
             "upload_date": db_pdf.upload_date
         }
 
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.error(f"Unexpected error in upload_pdf: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        logger.error(f"Error in upload_pdf: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/list")
 async def list_pdfs(
