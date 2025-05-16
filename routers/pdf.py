@@ -2,15 +2,18 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List
 import os
-import shutil
 from datetime import datetime
 import logging
+from services.local_storage_service import LocalStorageService
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
 # Create router
 router = APIRouter()
+
+# Initialize storage service
+storage_service = LocalStorageService()
 
 # Add a test endpoint
 @router.get("/test")
@@ -25,9 +28,6 @@ from routers.auth import oauth2_scheme
 from jose import jwt
 from utils.auth_utils import SECRET_KEY, ALGORITHM
 
-# Use /tmp for uploads in Railway environment
-UPLOAD_DIR = "/tmp/uploads"
-
 @router.post("/upload")
 async def upload_pdf(
     file: UploadFile = File(...),
@@ -35,10 +35,6 @@ async def upload_pdf(
     db: Session = Depends(get_db)
 ):
     try:
-        # Create upload directory if it doesn't exist
-        os.makedirs(UPLOAD_DIR, exist_ok=True)
-        logger.info(f"Using upload directory: {UPLOAD_DIR}")
-        
         # Verify user
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
@@ -51,37 +47,29 @@ async def upload_pdf(
         if not file.filename.lower().endswith('.pdf'):
             raise HTTPException(status_code=400, detail="Only PDF files are allowed")
 
-        # Create user-specific directory
-        user_dir = os.path.join(UPLOAD_DIR, str(user.id))
-        os.makedirs(user_dir, exist_ok=True)
-        logger.info(f"Created user directory: {user_dir}")
-
-        # Save file
-        file_path = os.path.join(user_dir, file.filename)
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        logger.info(f"Saved file to: {file_path}")
-
-        # Get file size
-        file_size = os.path.getsize(file_path)
+        # Upload file using storage service
+        file_info = await storage_service.upload_file(file, user.id)
+        if not file_info:
+            raise HTTPException(status_code=500, detail="Failed to upload file")
 
         # Create database entry
         db_pdf = DBPDFDocument(
             user_id=user.id,
-            filename=file.filename,
-            file_path=file_path,
-            size=file_size
+            filename=file_info["filename"],
+            file_path=file_info["path"],
+            size=file_info["size"]
         )
         db.add(db_pdf)
         db.commit()
         db.refresh(db_pdf)
-        logger.info(f"Created database entry for file: {file.filename}")
+        logger.info(f"Created database entry for file: {file_info['filename']}")
 
         return {
             "id": db_pdf.id,
             "filename": db_pdf.filename,
             "size": db_pdf.size,
-            "upload_date": db_pdf.upload_date
+            "upload_date": db_pdf.upload_date,
+            "original_name": file_info["original_name"]
         }
 
     except Exception as e:
@@ -102,20 +90,28 @@ async def list_pdfs(
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
-        # Get user's PDFs
-        pdfs = db.query(DBPDFDocument).filter(
+        # Get user's PDFs from storage
+        files = await storage_service.list_user_files(user.id)
+        
+        # Get database entries
+        db_pdfs = db.query(DBPDFDocument).filter(
             DBPDFDocument.user_id == user.id
         ).order_by(DBPDFDocument.upload_date.desc()).all()
+        
+        # Combine storage and database info
+        pdf_list = []
+        for db_pdf in db_pdfs:
+            file_info = next((f for f in files if f["filename"] == db_pdf.filename), None)
+            if file_info:
+                pdf_list.append({
+                    "id": db_pdf.id,
+                    "filename": db_pdf.filename,
+                    "size": db_pdf.size,
+                    "upload_date": db_pdf.upload_date,
+                    "path": file_info["path"]
+                })
 
-        return [
-            {
-                "id": pdf.id,
-                "filename": pdf.filename,
-                "size": pdf.size,
-                "upload_date": pdf.upload_date
-            }
-            for pdf in pdfs
-        ]
+        return pdf_list
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -144,9 +140,10 @@ async def delete_pdf(
         if not pdf:
             raise HTTPException(status_code=404, detail="PDF not found")
 
-        # Delete file
-        if os.path.exists(pdf.file_path):
-            os.remove(pdf.file_path)
+        # Delete from storage
+        success = await storage_service.delete_file(pdf.filename, user.id)
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to delete file from storage")
 
         # Delete database entry
         db.delete(pdf)

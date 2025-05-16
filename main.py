@@ -9,6 +9,7 @@ import logging
 from datetime import datetime
 from sqlalchemy import text
 from routers import auth, pdf  # Import pdf directly
+from services.local_storage_service import LocalStorageService
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -20,6 +21,7 @@ load_dotenv()
 # Get environment variables
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 PORT = os.getenv("PORT", "8000")
+UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/app/uploads")
 
 app = FastAPI(
     title="Simplim Backend",
@@ -59,21 +61,53 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Health check endpoint for Railway"""
-    return {
-        "status": "healthy",
-        "version": "1.0.0",
-        "environment": ENVIRONMENT,
-        "timestamp": datetime.utcnow().isoformat()
-    }
+    try:
+        # Check upload directory
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+        test_file = os.path.join(UPLOAD_DIR, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("test")
+        os.remove(test_file)
+        
+        return {
+            "status": "healthy",
+            "version": "1.0.0",
+            "environment": ENVIRONMENT,
+            "upload_dir": UPLOAD_DIR,
+            "upload_dir_writable": True,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        return {
+            "status": "unhealthy",
+            "error": str(e),
+            "upload_dir": UPLOAD_DIR,
+            "upload_dir_writable": False,
+            "timestamp": datetime.utcnow().isoformat()
+        }
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize database connection on startup"""
+    """Initialize services on startup"""
     try:
+        # Initialize database
         init_db()
         logger.info("Database connection initialized during startup")
+        
+        # Initialize upload directory
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+        logger.info(f"Upload directory initialized: {UPLOAD_DIR}")
+        
+        # Test write permissions
+        test_file = os.path.join(UPLOAD_DIR, "test.txt")
+        with open(test_file, "w") as f:
+            f.write("test")
+        os.remove(test_file)
+        logger.info("Upload directory is writable")
+        
     except Exception as e:
-        logger.error(f"Error initializing database during startup: {str(e)}")
+        logger.error(f"Error during startup: {str(e)}")
         # Don't raise the exception, let the app start without database
 
 @app.get("/db-status")
