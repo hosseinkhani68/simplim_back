@@ -15,12 +15,6 @@ router = APIRouter()
 # Initialize storage service
 storage_service = LocalStorageService()
 
-# Add a test endpoint
-@router.get("/test")
-async def test_pdf():
-    """Test endpoint to verify PDF router is working"""
-    return {"message": "PDF router is working"}
-
 # Import dependencies
 from database.database import get_db
 from database.models import PDFDocument as DBPDFDocument, User as DBUser

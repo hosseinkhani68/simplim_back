@@ -8,7 +8,7 @@ from database.models import User
 import logging
 from datetime import datetime
 from sqlalchemy import text
-from routers import auth  # Import pdf directly
+from routers import auth, pdf  # Import pdf directly
 from services.local_storage_service import LocalStorageService
 
 # Configure logging
@@ -30,9 +30,12 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
+# Initialize storage service
+storage_service = LocalStorageService()
+
 # Include routers
 app.include_router(auth.router, prefix="/auth", tags=["authentication"])
-# app.include_router(pdf.router, prefix="/pdf", tags=["pdf"])
+app.include_router(pdf.router, prefix="/pdf", tags=["pdf"])
 logger.info("Routers included successfully")
 
 # Log all registered routes
@@ -61,31 +64,66 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Health check endpoint for Railway"""
+    health_status = {
+        "status": "healthy",
+        "version": "1.0.0",
+        "environment": ENVIRONMENT,
+        "timestamp": datetime.utcnow().isoformat(),
+        "services": {
+            "database": "unknown",
+            "storage": "unknown"
+        }
+    }
+    
     try:
-        # Check upload directory
-        os.makedirs(UPLOAD_DIR, exist_ok=True)
-        test_file = os.path.join(UPLOAD_DIR, "test.txt")
+        # Check database
+        db = next(get_db())
+        db.execute(text("SELECT 1"))
+        health_status["services"]["database"] = "healthy"
+    except Exception as e:
+        logger.error(f"Database health check failed: {str(e)}")
+        health_status["services"]["database"] = "unhealthy"
+        health_status["status"] = "unhealthy"
+    
+    try:
+        # Check storage service
+        # Create a test directory
+        test_dir = os.path.join(UPLOAD_DIR, "health_check")
+        os.makedirs(test_dir, exist_ok=True)
+        
+        # Try to write a test file
+        test_file = os.path.join(test_dir, "test.txt")
         with open(test_file, "w") as f:
             f.write("test")
-        os.remove(test_file)
         
-        return {
-            "status": "healthy",
-            "version": "1.0.0",
-            "environment": ENVIRONMENT,
+        # Try to read the test file
+        with open(test_file, "r") as f:
+            content = f.read()
+            if content != "test":
+                raise Exception("File content mismatch")
+        
+        # Clean up
+        os.remove(test_file)
+        os.rmdir(test_dir)
+        
+        health_status["services"]["storage"] = "healthy"
+        health_status["storage"] = {
             "upload_dir": UPLOAD_DIR,
-            "upload_dir_writable": True,
-            "timestamp": datetime.utcnow().isoformat()
+            "writable": True,
+            "readable": True
         }
     except Exception as e:
-        logger.error(f"Health check failed: {str(e)}")
-        return {
-            "status": "unhealthy",
-            "error": str(e),
+        logger.error(f"Storage health check failed: {str(e)}")
+        health_status["services"]["storage"] = "unhealthy"
+        health_status["status"] = "unhealthy"
+        health_status["storage"] = {
             "upload_dir": UPLOAD_DIR,
-            "upload_dir_writable": False,
-            "timestamp": datetime.utcnow().isoformat()
+            "writable": False,
+            "readable": False,
+            "error": str(e)
         }
+    
+    return health_status
 
 @app.on_event("startup")
 async def startup_event():
@@ -95,17 +133,35 @@ async def startup_event():
         init_db()
         logger.info("Database connection initialized during startup")
         
-        # Initialize upload directory
-        os.makedirs(UPLOAD_DIR, exist_ok=True)
-        logger.info(f"Upload directory initialized: {UPLOAD_DIR}")
-        
-        # Test write permissions
-        test_file = os.path.join(UPLOAD_DIR, "test.txt")
-        with open(test_file, "w") as f:
-            f.write("test")
-        os.remove(test_file)
-        logger.info("Upload directory is writable")
-        
+        # Initialize storage service
+        try:
+            # Create base upload directory
+            os.makedirs(UPLOAD_DIR, exist_ok=True)
+            logger.info(f"Upload directory initialized: {UPLOAD_DIR}")
+            
+            # Test write permissions
+            test_dir = os.path.join(UPLOAD_DIR, "startup_test")
+            os.makedirs(test_dir, exist_ok=True)
+            
+            test_file = os.path.join(test_dir, "test.txt")
+            with open(test_file, "w") as f:
+                f.write("test")
+            
+            # Test read permissions
+            with open(test_file, "r") as f:
+                content = f.read()
+                if content != "test":
+                    raise Exception("File content mismatch")
+            
+            # Clean up
+            os.remove(test_file)
+            os.rmdir(test_dir)
+            
+            logger.info("Storage service initialized successfully")
+        except Exception as e:
+            logger.error(f"Storage service initialization failed: {str(e)}")
+            # Don't raise the exception, let the app start without storage
+            
     except Exception as e:
         logger.error(f"Error during startup: {str(e)}")
         # Don't raise the exception, let the app start without database
