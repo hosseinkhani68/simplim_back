@@ -8,7 +8,7 @@ from database.models import User
 import logging
 from datetime import datetime
 from sqlalchemy import text
-from routers import auth, pdf  # Import pdf directly
+from routers import auth  # Import pdf directly
 from services.local_storage_service import LocalStorageService
 
 # Configure logging
@@ -32,7 +32,7 @@ app = FastAPI(
 
 # Include routers
 app.include_router(auth.router, prefix="/auth", tags=["authentication"])
-app.include_router(pdf.router, prefix="/pdf", tags=["pdf"])
+# app.include_router(pdf.router, prefix="/pdf", tags=["pdf"])
 logger.info("Routers included successfully")
 
 # Log all registered routes
