@@ -16,16 +16,10 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Create uploads directory if it doesn't exist
-try:
-    UPLOAD_DIR = os.path.join(os.getcwd(), "uploads")
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-    logger.info(f"Upload directory created at: {UPLOAD_DIR}")
-except Exception as e:
-    logger.error(f"Error creating upload directory: {str(e)}")
-    UPLOAD_DIR = "/tmp/uploads"  # Fallback to /tmp if main directory fails
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-    logger.info(f"Using fallback upload directory: {UPLOAD_DIR}")
+# Use /tmp for uploads in Railway environment
+UPLOAD_DIR = "/tmp/uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+logger.info(f"Using upload directory: {UPLOAD_DIR}")
 
 @router.post("/upload")
 async def upload_pdf(

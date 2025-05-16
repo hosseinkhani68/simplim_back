@@ -32,9 +32,13 @@ app.include_router(auth.router, prefix="/auth", tags=["authentication"])
 
 # Try to include PDF router, but don't fail if it doesn't work
 try:
+    logger.info("Attempting to import PDF router...")
     from routers import pdf
+    logger.info("PDF router imported successfully")
     app.include_router(pdf.router, prefix="/pdf", tags=["pdf"])
     logger.info("PDF router included successfully")
+except ImportError as e:
+    logger.error(f"Failed to import PDF router: {str(e)}")
 except Exception as e:
     logger.error(f"Error including PDF router: {str(e)}")
     # Don't raise the exception, let the app start without PDF functionality
@@ -49,10 +53,15 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize database connection on startup"""
+    """Initialize database connection and create tables on startup"""
     try:
         init_db()
         logger.info("Database connection initialized during startup")
+        
+        # Import models to ensure they are registered with SQLAlchemy
+        from database.models import User, TextHistory, PDFDocument
+        logger.info("Database models imported successfully")
+        
     except Exception as e:
         logger.error(f"Error initializing database during startup: {str(e)}")
         # Don't raise the exception, let the app start without database
