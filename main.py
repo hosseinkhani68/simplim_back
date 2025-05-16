@@ -8,7 +8,7 @@ from database.models import User
 import logging
 from datetime import datetime
 from sqlalchemy import text
-from routers import auth, pdf
+from routers import auth
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
