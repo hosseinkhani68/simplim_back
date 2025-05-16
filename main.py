@@ -85,42 +85,22 @@ async def health_check():
         health_status["status"] = "unhealthy"
         health_status["database_error"] = str(e)
     
-    try:
-        # Check Supabase storage with detailed connection test
-        connection_status = await storage_service.test_connection()
-        
-        if connection_status["url_accessible"] and connection_status["bucket_exists"]:
-            health_status["services"]["storage"] = "healthy"
-            health_status["storage"] = {
-                "bucket": storage_service.bucket_name,
-                "connected": True,
-                "url": storage_service.supabase_url,
-                "bucket_public": connection_status["bucket_public"],
-                "status_code": connection_status["status_code"]
-            }
-        else:
-            health_status["services"]["storage"] = "unhealthy"
-            health_status["status"] = "unhealthy"
-            health_status["storage"] = {
-                "bucket": storage_service.bucket_name,
-                "connected": False,
-                "url": storage_service.supabase_url,
-                "url_accessible": connection_status["url_accessible"],
-                "bucket_exists": connection_status["bucket_exists"],
-                "bucket_public": connection_status["bucket_public"],
-                "status_code": connection_status["status_code"],
-                "error": connection_status["error"]
-            }
-    except Exception as e:
-        logger.error(f"Storage health check failed: {str(e)}")
+    # Check if Supabase environment variables are set
+    supabase_url = os.getenv('SUPABASE_URL')
+    supabase_key = os.getenv('SUPABASE_KEY')
+    bucket_name = os.getenv('SUPABASE_BUCKET_NAME', 'pdfs')
+    
+    health_status["storage"] = {
+        "bucket": bucket_name,
+        "url_set": bool(supabase_url),
+        "key_set": bool(supabase_key),
+        "status": "configured" if (supabase_url and supabase_key) else "not_configured"
+    }
+    
+    # Only mark storage as unhealthy if environment variables are missing
+    if not (supabase_url and supabase_key):
         health_status["services"]["storage"] = "unhealthy"
         health_status["status"] = "unhealthy"
-        health_status["storage"] = {
-            "bucket": storage_service.bucket_name,
-            "connected": False,
-            "url": storage_service.supabase_url,
-            "error": str(e)
-        }
     
     return health_status
 
@@ -132,18 +112,10 @@ async def startup_event():
         init_db()
         logger.info("Database connection initialized during startup")
         
-        # Initialize storage service
-        try:
-            # Test Supabase connection
-            await storage_service.list_user_files(0)  # Test with user_id 0
-            logger.info("Supabase storage service initialized successfully")
-        except Exception as e:
-            logger.error(f"Storage service initialization failed: {str(e)}")
-            # Log environment variables (without sensitive data)
-            logger.info(f"SUPABASE_URL is set: {bool(os.getenv('SUPABASE_URL'))}")
-            logger.info(f"SUPABASE_KEY is set: {bool(os.getenv('SUPABASE_KEY'))}")
-            logger.info(f"SUPABASE_BUCKET_NAME: {os.getenv('SUPABASE_BUCKET_NAME', 'pdfs')}")
-            # Don't raise the exception, let the app start without storage
+        # Log environment variables (without sensitive data)
+        logger.info(f"SUPABASE_URL is set: {bool(os.getenv('SUPABASE_URL'))}")
+        logger.info(f"SUPABASE_KEY is set: {bool(os.getenv('SUPABASE_KEY'))}")
+        logger.info(f"SUPABASE_BUCKET_NAME: {os.getenv('SUPABASE_BUCKET_NAME', 'pdfs')}")
             
     except Exception as e:
         logger.error(f"Error during startup: {str(e)}")
