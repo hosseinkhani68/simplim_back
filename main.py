@@ -86,15 +86,31 @@ async def health_check():
         health_status["database_error"] = str(e)
     
     try:
-        # Check Supabase storage
-        # Try to list files in the bucket
-        files = await storage_service.list_user_files(0)  # Test with user_id 0
-        health_status["services"]["storage"] = "healthy"
-        health_status["storage"] = {
-            "bucket": storage_service.bucket_name,
-            "connected": True,
-            "url": storage_service.supabase_url
-        }
+        # Check Supabase storage with detailed connection test
+        connection_status = await storage_service.test_connection()
+        
+        if connection_status["url_accessible"] and connection_status["bucket_exists"]:
+            health_status["services"]["storage"] = "healthy"
+            health_status["storage"] = {
+                "bucket": storage_service.bucket_name,
+                "connected": True,
+                "url": storage_service.supabase_url,
+                "bucket_public": connection_status["bucket_public"],
+                "status_code": connection_status["status_code"]
+            }
+        else:
+            health_status["services"]["storage"] = "unhealthy"
+            health_status["status"] = "unhealthy"
+            health_status["storage"] = {
+                "bucket": storage_service.bucket_name,
+                "connected": False,
+                "url": storage_service.supabase_url,
+                "url_accessible": connection_status["url_accessible"],
+                "bucket_exists": connection_status["bucket_exists"],
+                "bucket_public": connection_status["bucket_public"],
+                "status_code": connection_status["status_code"],
+                "error": connection_status["error"]
+            }
     except Exception as e:
         logger.error(f"Storage health check failed: {str(e)}")
         health_status["services"]["storage"] = "unhealthy"
