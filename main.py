@@ -33,9 +33,18 @@ app.include_router(auth.router, prefix="/auth", tags=["authentication"])
 
 # Try to include PDF router, but don't fail if it doesn't work
 try:
+    logger.info("Attempting to import PDF router...")
     from routers import pdf
+    logger.info("PDF router imported successfully")
     app.include_router(pdf.router, prefix="/pdf", tags=["pdf"])
     logger.info("PDF router included successfully")
+    
+    # Log all registered routes
+    logger.info("Registered routes:")
+    for route in app.routes:
+        logger.info(f"Route: {route.path}, methods: {route.methods}")
+except ImportError as e:
+    logger.error(f"Failed to import PDF router: {str(e)}")
 except Exception as e:
     logger.error(f"Error including PDF router: {str(e)}")
     # Don't raise the exception, let the app start without PDF functionality

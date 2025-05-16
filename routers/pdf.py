@@ -12,6 +12,16 @@ logger = logging.getLogger(__name__)
 logger.info(f"Python path in pdf.py: {sys.path}")
 logger.info(f"Current working directory in pdf.py: {os.getcwd()}")
 
+# Create router first
+router = APIRouter()
+
+# Add a test endpoint that doesn't depend on any imports
+@router.get("/test")
+async def test_pdf():
+    """Test endpoint to verify PDF router is working"""
+    return {"message": "PDF router is working"}
+
+# Now try to import dependencies
 try:
     from database.database import get_db
     from database.models import PDFDocument as DBPDFDocument, User as DBUser
@@ -21,15 +31,7 @@ try:
     logger.info("All imports successful in pdf.py")
 except ImportError as e:
     logger.error(f"Import error in pdf.py: {str(e)}")
-    raise
-
-router = APIRouter()
-
-# Add a test endpoint
-@router.get("/test")
-async def test_pdf():
-    """Test endpoint to verify PDF router is working"""
-    return {"message": "PDF router is working"}
+    # Don't raise the exception, let the router continue with basic functionality
 
 # Use /tmp for uploads in Railway environment
 UPLOAD_DIR = "/tmp/uploads"
@@ -45,6 +47,7 @@ async def upload_pdf(
     try:
         # Create upload directory if it doesn't exist
         os.makedirs(UPLOAD_DIR, exist_ok=True)
+        logger.info(f"Using upload directory: {UPLOAD_DIR}")
         
         # Verify user
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -61,11 +64,13 @@ async def upload_pdf(
         # Create user-specific directory
         user_dir = os.path.join(UPLOAD_DIR, str(user.id))
         os.makedirs(user_dir, exist_ok=True)
+        logger.info(f"Created user directory: {user_dir}")
 
         # Save file
         file_path = os.path.join(user_dir, file.filename)
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
+        logger.info(f"Saved file to: {file_path}")
 
         # Get file size
         file_size = os.path.getsize(file_path)
@@ -80,6 +85,7 @@ async def upload_pdf(
         db.add(db_pdf)
         db.commit()
         db.refresh(db_pdf)
+        logger.info(f"Created database entry for file: {file.filename}")
 
         return {
             "id": db_pdf.id,
