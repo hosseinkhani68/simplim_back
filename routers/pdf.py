@@ -4,7 +4,6 @@ from typing import List
 import os
 import shutil
 from datetime import datetime
-from models.user import PDFDocument, PDFDocumentCreate
 from database.database import get_db
 from database.models import PDFDocument as DBPDFDocument, User as DBUser
 from routers.auth import oauth2_scheme
@@ -104,7 +103,7 @@ async def upload_pdf(
         logger.error(f"Unexpected error in upload_pdf: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-@router.get("/list", response_model=List[PDFDocument])
+@router.get("/list")
 async def list_pdfs(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
@@ -123,7 +122,15 @@ async def list_pdfs(
             DBPDFDocument.user_id == user.id
         ).order_by(DBPDFDocument.upload_date.desc()).all()
 
-        return pdfs
+        return [
+            {
+                "id": pdf.id,
+                "filename": pdf.filename,
+                "size": pdf.size,
+                "upload_date": pdf.upload_date
+            }
+            for pdf in pdfs
+        ]
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
