@@ -19,6 +19,7 @@ load_dotenv()
 
 # Get environment variables
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+PORT = os.getenv("PORT", "8000")
 
 app = FastAPI(
     title="Simplim Backend",
@@ -29,7 +30,15 @@ app = FastAPI(
 
 # Include routers
 app.include_router(auth.router, prefix="/auth", tags=["authentication"])
-# app.include_router(pdf.router, prefix="/pdf", tags=["pdf"])
+
+# Try to include PDF router, but don't fail if it doesn't work
+try:
+    from routers import pdf
+    app.include_router(pdf.router, prefix="/pdf", tags=["pdf"])
+    logger.info("PDF router included successfully")
+except Exception as e:
+    logger.error(f"Error including PDF router: {str(e)}")
+    # Don't raise the exception, let the app start without PDF functionality
 
 app.add_middleware(
     CORSMiddleware,
@@ -38,6 +47,26 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/")
+async def root():
+    """Root endpoint"""
+    return {
+        "status": "ok",
+        "message": "Simplim API is running",
+        "environment": ENVIRONMENT,
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for Railway"""
+    return {
+        "status": "healthy",
+        "version": "1.0.0",
+        "environment": ENVIRONMENT,
+        "timestamp": datetime.utcnow().isoformat()
+    }
 
 @app.on_event("startup")
 async def startup_event():
@@ -48,16 +77,6 @@ async def startup_event():
     except Exception as e:
         logger.error(f"Error initializing database during startup: {str(e)}")
         # Don't raise the exception, let the app start without database
-
-@app.get("/")
-async def root():
-    """Health check endpoint"""
-    return {
-        "status": "ok",
-        "message": "Simplim API is running",
-        "environment": ENVIRONMENT,
-        "timestamp": datetime.utcnow().isoformat()
-    }
 
 @app.get("/db-status")
 async def db_status(db: Session = Depends(get_db)):
@@ -125,31 +144,6 @@ async def monitor_db(db: Session = Depends(get_db)):
         }
     except Exception as e:
         logger.error(f"Database monitoring failed: {str(e)}")
-        return {
-            "status": "unhealthy",
-            "error": str(e),
-            "timestamp": datetime.utcnow().isoformat()
-        }
-
-@app.get("/health")
-async def health_check(db: Session = Depends(get_db)):
-    """Comprehensive health check endpoint"""
-    try:
-        # Check database connection
-        db_check = db.execute(text("SELECT 1")).scalar()
-        
-        # Get application info
-        app_info = {
-            "status": "healthy",
-            "version": "1.0.0",
-            "environment": ENVIRONMENT,
-            "database": "connected",
-            "timestamp": datetime.utcnow().isoformat()
-        }
-        
-        return app_info
-    except Exception as e:
-        logger.error(f"Health check failed: {str(e)}")
         return {
             "status": "unhealthy",
             "error": str(e),
