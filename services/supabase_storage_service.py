@@ -92,16 +92,23 @@ class SupabaseStorageService:
             logger.info(f"Generated file path: {file_path}")
             
             try:
-                # Upload to Supabase Storage
+                # Upload to Supabase Storage using direct HTTP request
                 logger.info("Attempting to upload to Supabase Storage...")
                 try:
-                    response = self._client.storage.from_(self.bucket_name).upload(
-                        path=file_path,
-                        file=io.BytesIO(content),  # Wrap content in a stream
-                        file_options={"content-type": file.content_type or "application/pdf"},
-                        upsert=True
-                    )
-                    logger.info(f"Upload response: {response}")
+                    upload_url = f"{self.supabase_url}/storage/v1/object/{self.bucket_name}/{file_path}"
+                    headers = {
+                        "Authorization": f"Bearer {self.supabase_key}",
+                        "Content-Type": file.content_type or "application/pdf"
+                    }
+                    logger.info(f"Uploading to URL: {upload_url}")
+                    
+                    res = requests.post(upload_url, headers=headers, data=content)
+                    
+                    if res.status_code not in [200, 201]:
+                        logger.error(f"HTTP Upload Failed: {res.status_code} {res.text}")
+                        raise ValueError(f"Upload failed: {res.text}")
+                    
+                    logger.info(f"Upload successful: {res.status_code}")
                 except Exception as upload_error:
                     logger.error(f"Error during upload: {str(upload_error)}")
                     raise ValueError(f"Error during upload: {str(upload_error)}")
