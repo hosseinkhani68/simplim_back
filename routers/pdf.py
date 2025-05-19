@@ -4,7 +4,7 @@ from typing import List
 import os
 from datetime import datetime
 import logging
-# from services.supabase_storage_service import SupabaseStorageService
+from services.supabase_storage_service import SupabaseStorageService
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -13,13 +13,35 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Initialize storage service
-# storage_service = SupabaseStorageService()
+storage_service = SupabaseStorageService()
 
 # Add a test endpoint
 @router.get("/test")
 async def test_pdf():
     """Test endpoint to verify PDF router is working"""
     return {"message": "PDF router is working"}
+
+@router.post("/upload")
+async def test_upload_pdf(file: UploadFile = File(...)):
+    """Test endpoint for uploading PDF files without authentication"""
+    try:
+        # Validate file type
+        if not file.filename.lower().endswith('.pdf'):
+            raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+
+        # Upload file using storage service (using a test user ID of 1)
+        file_info = await storage_service.upload_file(file, 1)
+        if not file_info:
+            raise HTTPException(status_code=500, detail="Failed to upload file")
+
+        return {
+            "message": "File uploaded successfully",
+            "file_info": file_info
+        }
+
+    except Exception as e:
+        logger.error(f"Error in test_upload_pdf: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Import dependencies
 # from database.database import get_db
