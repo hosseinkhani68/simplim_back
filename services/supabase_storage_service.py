@@ -19,28 +19,27 @@ class SupabaseStorageService:
         self._client = None
         
         # Log configuration (without sensitive data)
-        logger.info(f"Initializing Supabase storage service with URL: {self.supabase_url}")
+        logger.info(f"Initializing Supabase storage service with URL: {bool(self.supabase_url)}")
         logger.info(f"Using bucket: {self.bucket_name}")
         
         if not self.supabase_url or not self.supabase_key:
-            logger.error("Supabase URL or key not set in environment variables")
-            raise ValueError("Supabase URL and key must be set in environment variables")
-        
-        # Try to initialize the client immediately
-        try:
-            self._client = create_client(self.supabase_url, self.supabase_key)
-            logger.info("Successfully initialized Supabase client")
-        except Exception as e:
-            logger.error(f"Failed to initialize Supabase client: {str(e)}")
-            raise ValueError(f"Failed to initialize Supabase client: {str(e)}")
+            logger.warning("Supabase URL or key not set in environment variables")
+        else:
+            # Try to initialize the client, but don't fail if it doesn't work
+            try:
+                self._client = create_client(self.supabase_url, self.supabase_key)
+                logger.info("Successfully initialized Supabase client")
+            except Exception as e:
+                logger.warning(f"Failed to initialize Supabase client: {str(e)}")
+                self._client = None
     
     @property
     def client(self) -> Client:
         """Lazy initialization of Supabase client"""
         if self._client is None:
+            if not self.supabase_url or not self.supabase_key:
+                raise ValueError("Supabase URL and key must be set in environment variables")
             try:
-                if not self.supabase_url or not self.supabase_key:
-                    raise ValueError("Supabase URL and key must be set in environment variables")
                 self._client = create_client(self.supabase_url, self.supabase_key)
                 logger.info("Successfully initialized Supabase client")
             except Exception as e:
