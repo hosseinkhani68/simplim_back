@@ -6,6 +6,7 @@ from typing import Optional, List, Dict
 from fastapi import UploadFile
 import mimetypes
 import requests
+import io
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -96,8 +97,8 @@ class SupabaseStorageService:
                 try:
                     response = self._client.storage.from_(self.bucket_name).upload(
                         path=file_path,
-                        file=content,
-                        file_options={"content-type": "application/pdf"},
+                        file=io.BytesIO(content),  # Wrap content in a stream
+                        file_options={"content-type": file.content_type or "application/pdf"},
                         upsert=True
                     )
                     logger.info(f"Upload response: {response}")
@@ -120,7 +121,7 @@ class SupabaseStorageService:
                     "original_name": file.filename,
                     "path": file_path,
                     "size": len(content),
-                    "content_type": "application/pdf",
+                    "content_type": file.content_type or "application/pdf",
                     "url": url,
                     "upload_date": datetime.now().isoformat()
                 }
