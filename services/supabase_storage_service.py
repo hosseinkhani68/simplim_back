@@ -23,25 +23,56 @@ class SupabaseStorageService:
         logger.info(f"Using bucket: {self.bucket_name}")
         
         if not self.supabase_url or not self.supabase_key:
-            logger.warning("Supabase URL or key not set in environment variables")
+            logger.error("Supabase URL or key not set in environment variables")
+            raise ValueError("Supabase URL and key must be set in environment variables")
+        
+        # Try to initialize the client immediately
+        try:
+            self._client = create_client(self.supabase_url, self.supabase_key)
+            logger.info("Successfully initialized Supabase client")
+        except Exception as e:
+            logger.error(f"Failed to initialize Supabase client: {str(e)}")
+            raise ValueError(f"Failed to initialize Supabase client: {str(e)}")
     
     @property
     def client(self) -> Client:
         """Lazy initialization of Supabase client"""
         if self._client is None:
-            if not self.supabase_url or not self.supabase_key:
-                raise ValueError("Supabase URL and key must be set in environment variables")
-            self._client = create_client(self.supabase_url, self.supabase_key)
+            try:
+                if not self.supabase_url or not self.supabase_key:
+                    raise ValueError("Supabase URL and key must be set in environment variables")
+                self._client = create_client(self.supabase_url, self.supabase_key)
+                logger.info("Successfully initialized Supabase client")
+            except Exception as e:
+                logger.error(f"Failed to initialize Supabase client: {str(e)}")
+                raise ValueError(f"Failed to initialize Supabase client: {str(e)}")
         return self._client
 
     async def upload_file(self, file: UploadFile, user_id: int) -> Optional[dict]:
         """Upload a file to Supabase Storage"""
         try:
+            # Verify client is initialized
+            if not self._client:
+                logger.error("Supabase client not initialized")
+                raise ValueError("Supabase client not initialized")
+
             # Log configuration status
             logger.info(f"Attempting to upload file for user {user_id}")
             logger.info(f"Supabase URL configured: {bool(self.supabase_url)}")
             logger.info(f"Supabase Key configured: {bool(self.supabase_key)}")
             logger.info(f"Using bucket: {self.bucket_name}")
+
+            # Verify bucket exists
+            try:
+                buckets = self._client.storage.list_buckets()
+                bucket_names = [bucket['name'] for bucket in buckets]
+                if self.bucket_name not in bucket_names:
+                    logger.error(f"Bucket '{self.bucket_name}' not found in Supabase. Available buckets: {bucket_names}")
+                    raise ValueError(f"Bucket '{self.bucket_name}' not found in Supabase")
+                logger.info(f"Verified bucket '{self.bucket_name}' exists")
+            except Exception as bucket_error:
+                logger.error(f"Error checking bucket existence: {str(bucket_error)}")
+                raise ValueError(f"Error checking bucket existence: {str(bucket_error)}")
 
             # Read file content
             content = await file.read()
@@ -56,7 +87,7 @@ class SupabaseStorageService:
             try:
                 # Upload to Supabase Storage
                 logger.info("Attempting to upload to Supabase Storage...")
-                response = self.client.storage.from_(self.bucket_name).upload(
+                response = self._client.storage.from_(self.bucket_name).upload(
                     file_path,
                     content,
                     {"content-type": "application/pdf"}
@@ -64,7 +95,7 @@ class SupabaseStorageService:
                 logger.info("Successfully uploaded to Supabase Storage")
                 
                 # Get public URL
-                url = self.client.storage.from_(self.bucket_name).get_public_url(file_path)
+                url = self._client.storage.from_(self.bucket_name).get_public_url(file_path)
                 logger.info(f"Generated public URL: {url}")
                 
                 file_info = {
