@@ -65,7 +65,7 @@ class SupabaseStorageService:
             # Verify bucket exists
             try:
                 buckets = self._client.storage.list_buckets()
-                bucket_names = [bucket['name'] for bucket in buckets]
+                bucket_names = [bucket.name for bucket in buckets]
                 if self.bucket_name not in bucket_names:
                     logger.error(f"Bucket '{self.bucket_name}' not found in Supabase. Available buckets: {bucket_names}")
                     raise ValueError(f"Bucket '{self.bucket_name}' not found in Supabase")
@@ -95,26 +95,46 @@ class SupabaseStorageService:
                 # Upload to Supabase Storage using direct HTTP request
                 logger.info("Attempting to upload to Supabase Storage...")
                 try:
+                    # Construct the upload URL
                     upload_url = f"{self.supabase_url}/storage/v1/object/{self.bucket_name}/{file_path}"
+                    logger.info(f"Upload URL: {upload_url}")
+
+                    # Set up headers
                     headers = {
                         "Authorization": f"Bearer {self.supabase_key}",
-                        "Content-Type": file.content_type or "application/pdf"
+                        "Content-Type": file.content_type or "application/pdf",
+                        "x-upsert": "true"  # Enable upsert
                     }
-                    logger.info(f"Uploading to URL: {upload_url}")
-                    
+                    logger.info(f"Request headers: {headers}")
+
+                    # Make the upload request
+                    logger.info("Sending upload request...")
                     res = requests.post(upload_url, headers=headers, data=content)
+                    logger.info(f"Response status code: {res.status_code}")
+                    logger.info(f"Response headers: {res.headers}")
+                    logger.info(f"Response body: {res.text}")
                     
                     if res.status_code not in [200, 201]:
-                        logger.error(f"HTTP Upload Failed: {res.status_code} {res.text}")
-                        raise ValueError(f"Upload failed: {res.text}")
+                        error_msg = f"HTTP Upload Failed: {res.status_code} - {res.text}"
+                        logger.error(error_msg)
+                        raise ValueError(error_msg)
                     
+                    # Parse the response
+                    try:
+                        response_data = res.json()
+                        logger.info(f"Parsed response data: {response_data}")
+                    except Exception as json_error:
+                        logger.warning(f"Could not parse response as JSON: {str(json_error)}")
+                        response_data = {}
+
                     logger.info(f"Upload successful: {res.status_code}")
+                except requests.exceptions.RequestException as req_error:
+                    logger.error(f"Request error: {str(req_error)}")
+                    raise ValueError(f"Request error: {str(req_error)}")
                 except Exception as upload_error:
                     logger.error(f"Error during upload: {str(upload_error)}")
                     raise ValueError(f"Error during upload: {str(upload_error)}")
 
-                logger.info("Successfully uploaded to Supabase Storage")
-                
                 # Get public URL
                 try:
                     url = self._client.storage.from_(self.bucket_name).get_public_url(file_path)
