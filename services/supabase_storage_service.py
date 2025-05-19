@@ -74,8 +74,15 @@ class SupabaseStorageService:
                 raise ValueError(f"Error checking bucket existence: {str(bucket_error)}")
 
             # Read file content
-            content = await file.read()
-            logger.info(f"Successfully read file content, size: {len(content)} bytes")
+            try:
+                content = await file.read()
+                if not content:
+                    logger.error("File content is empty")
+                    raise ValueError("File content is empty")
+                logger.info(f"Successfully read file content, size: {len(content)} bytes")
+            except Exception as read_error:
+                logger.error(f"Error reading file: {str(read_error)}")
+                raise ValueError(f"Error reading file: {str(read_error)}")
             
             # Generate unique filename
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -86,16 +93,26 @@ class SupabaseStorageService:
             try:
                 # Upload to Supabase Storage
                 logger.info("Attempting to upload to Supabase Storage...")
-                response = self._client.storage.from_(self.bucket_name).upload(
-                    file_path,
-                    content,
-                    {"content-type": "application/pdf"}
-                )
+                try:
+                    response = self._client.storage.from_(self.bucket_name).upload(
+                        file_path,
+                        content,
+                        {"content-type": "application/pdf"}
+                    )
+                    logger.info(f"Upload response: {response}")
+                except Exception as upload_error:
+                    logger.error(f"Error during upload: {str(upload_error)}")
+                    raise ValueError(f"Error during upload: {str(upload_error)}")
+
                 logger.info("Successfully uploaded to Supabase Storage")
                 
                 # Get public URL
-                url = self._client.storage.from_(self.bucket_name).get_public_url(file_path)
-                logger.info(f"Generated public URL: {url}")
+                try:
+                    url = self._client.storage.from_(self.bucket_name).get_public_url(file_path)
+                    logger.info(f"Generated public URL: {url}")
+                except Exception as url_error:
+                    logger.error(f"Error getting public URL: {str(url_error)}")
+                    raise ValueError(f"Error getting public URL: {str(url_error)}")
                 
                 file_info = {
                     "filename": safe_filename,

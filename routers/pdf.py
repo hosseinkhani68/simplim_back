@@ -42,22 +42,33 @@ async def test_upload_pdf(file: UploadFile = File(...)):
             file_info = await storage_service.upload_file(file, 1)
             if not file_info:
                 logger.error("Storage service returned None for file_info")
-                raise HTTPException(status_code=500, detail="Failed to upload file - no file info returned")
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to upload file - storage service returned no file info"
+                )
+            return {
+                "message": "File uploaded successfully",
+                "file_info": file_info
+            }
+        except ValueError as ve:
+            logger.error(f"Validation error: {str(ve)}")
+            raise HTTPException(status_code=400, detail=str(ve))
         except Exception as storage_error:
             logger.error(f"Storage service error: {str(storage_error)}")
-            raise HTTPException(status_code=500, detail=f"Storage service error: {str(storage_error)}")
-
-        return {
-            "message": "File uploaded successfully",
-            "file_info": file_info
-        }
+            raise HTTPException(
+                status_code=500,
+                detail=f"Storage service error: {str(storage_error)}"
+            )
 
     except HTTPException as he:
         # Re-raise HTTP exceptions as they are already properly formatted
         raise he
     except Exception as e:
         logger.error(f"Unexpected error in test_upload_pdf: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unexpected error: {str(e)}"
+        )
 
 # Import dependencies
 # from database.database import get_db
