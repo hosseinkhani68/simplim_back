@@ -95,9 +95,10 @@ class SupabaseStorageService:
                 logger.info("Attempting to upload to Supabase Storage...")
                 try:
                     response = self._client.storage.from_(self.bucket_name).upload(
-                        file_path,
-                        content,
-                        {"contentType": "application/pdf"}
+                        path=file_path,
+                        file=content,
+                        file_options={"content-type": "application/pdf"},
+                        upsert=True
                     )
                     logger.info(f"Upload response: {response}")
                 except Exception as upload_error:
