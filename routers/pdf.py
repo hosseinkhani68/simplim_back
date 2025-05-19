@@ -25,23 +25,39 @@ async def test_pdf():
 async def test_upload_pdf(file: UploadFile = File(...)):
     """Test endpoint for uploading PDF files without authentication"""
     try:
+        # Log the incoming file details
+        logger.info(f"Attempting to upload file: {file.filename}")
+        
         # Validate file type
         if not file.filename.lower().endswith('.pdf'):
             raise HTTPException(status_code=400, detail="Only PDF files are allowed")
 
+        # Log Supabase configuration
+        logger.info(f"Supabase URL configured: {bool(os.getenv('SUPABASE_URL'))}")
+        logger.info(f"Supabase Key configured: {bool(os.getenv('SUPABASE_KEY'))}")
+        logger.info(f"Supabase Bucket: {os.getenv('SUPABASE_BUCKET_NAME', 'pdfs')}")
+
         # Upload file using storage service (using a test user ID of 1)
-        file_info = await storage_service.upload_file(file, 1)
-        if not file_info:
-            raise HTTPException(status_code=500, detail="Failed to upload file")
+        try:
+            file_info = await storage_service.upload_file(file, 1)
+            if not file_info:
+                logger.error("Storage service returned None for file_info")
+                raise HTTPException(status_code=500, detail="Failed to upload file - no file info returned")
+        except Exception as storage_error:
+            logger.error(f"Storage service error: {str(storage_error)}")
+            raise HTTPException(status_code=500, detail=f"Storage service error: {str(storage_error)}")
 
         return {
             "message": "File uploaded successfully",
             "file_info": file_info
         }
 
+    except HTTPException as he:
+        # Re-raise HTTP exceptions as they are already properly formatted
+        raise he
     except Exception as e:
-        logger.error(f"Error in test_upload_pdf: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Unexpected error in test_upload_pdf: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
 # Import dependencies
 # from database.database import get_db

@@ -37,36 +37,52 @@ class SupabaseStorageService:
     async def upload_file(self, file: UploadFile, user_id: int) -> Optional[dict]:
         """Upload a file to Supabase Storage"""
         try:
+            # Log configuration status
+            logger.info(f"Attempting to upload file for user {user_id}")
+            logger.info(f"Supabase URL configured: {bool(self.supabase_url)}")
+            logger.info(f"Supabase Key configured: {bool(self.supabase_key)}")
+            logger.info(f"Using bucket: {self.bucket_name}")
+
             # Read file content
             content = await file.read()
+            logger.info(f"Successfully read file content, size: {len(content)} bytes")
             
             # Generate unique filename
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             safe_filename = f"{timestamp}_{file.filename}"
             file_path = f"users/{user_id}/{safe_filename}"
+            logger.info(f"Generated file path: {file_path}")
             
-            # Upload to Supabase Storage
-            response = self.client.storage.from_(self.bucket_name).upload(
-                file_path,
-                content,
-                {"content-type": "application/pdf"}
-            )
-            
-            # Get public URL
-            url = self.client.storage.from_(self.bucket_name).get_public_url(file_path)
-            
-            file_info = {
-                "filename": safe_filename,
-                "original_name": file.filename,
-                "path": file_path,
-                "size": len(content),
-                "content_type": "application/pdf",
-                "url": url,
-                "upload_date": datetime.now().isoformat()
-            }
-            
-            logger.info(f"File uploaded successfully to Supabase: {file_info}")
-            return file_info
+            try:
+                # Upload to Supabase Storage
+                logger.info("Attempting to upload to Supabase Storage...")
+                response = self.client.storage.from_(self.bucket_name).upload(
+                    file_path,
+                    content,
+                    {"content-type": "application/pdf"}
+                )
+                logger.info("Successfully uploaded to Supabase Storage")
+                
+                # Get public URL
+                url = self.client.storage.from_(self.bucket_name).get_public_url(file_path)
+                logger.info(f"Generated public URL: {url}")
+                
+                file_info = {
+                    "filename": safe_filename,
+                    "original_name": file.filename,
+                    "path": file_path,
+                    "size": len(content),
+                    "content_type": "application/pdf",
+                    "url": url,
+                    "upload_date": datetime.now().isoformat()
+                }
+                
+                logger.info(f"File uploaded successfully to Supabase: {file_info}")
+                return file_info
+                
+            except Exception as supabase_error:
+                logger.error(f"Supabase storage error: {str(supabase_error)}")
+                raise Exception(f"Supabase storage error: {str(supabase_error)}")
             
         except Exception as e:
             logger.error(f"Error uploading file to Supabase: {str(e)}")
