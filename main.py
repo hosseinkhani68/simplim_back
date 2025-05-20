@@ -57,15 +57,33 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Health check endpoint for Railway"""
-    health_status = {
-        "status": "healthy",
-        "version": "1.0.0",
-        "environment": ENVIRONMENT,
-        "timestamp": datetime.utcnow().isoformat(),
-        "services": {
-            "database": "unknown"
+    try:
+        # Test database connection
+        db = next(get_db())
+        db.execute(text("SELECT 1"))
+        db.close()
+        
+        health_status = {
+            "status": "healthy",
+            "version": "1.0.0",
+            "environment": ENVIRONMENT,
+            "timestamp": datetime.utcnow().isoformat(),
+            "services": {
+                "database": "connected"
+            }
         }
-    }
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        health_status = {
+            "status": "unhealthy",
+            "version": "1.0.0",
+            "environment": ENVIRONMENT,
+            "timestamp": datetime.utcnow().isoformat(),
+            "services": {
+                "database": "disconnected"
+            },
+            "error": str(e)
+        }
     
     return health_status
 
@@ -76,6 +94,10 @@ async def startup_event():
         logger.info("Starting application initialization...")
         logger.info(f"ENVIRONMENT: {ENVIRONMENT}")
         logger.info(f"PORT: {PORT}")
+        
+        # Initialize database
+        init_db()
+        logger.info("Database initialized successfully")
         
         # Log environment variables (without sensitive values)
         env_vars = {
@@ -89,7 +111,7 @@ async def startup_event():
     except Exception as e:
         logger.error(f"Error during startup: {str(e)}")
         logger.exception("Detailed startup error:")
-        # Don't raise the exception, let the app start without database
+        raise  # Raise the exception to prevent the app from starting with a broken database
 
 @app.get("/db-status")
 async def db_status(db: Session = Depends(get_db)):
