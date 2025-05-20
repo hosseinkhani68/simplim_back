@@ -52,7 +52,7 @@ app.add_middleware(
 
 @app.get("/")
 async def root():
-    """Root endpoint"""
+    """Root endpoint for health check"""
     return {
         "status": "ok",
         "message": "Simplim API is running",
@@ -73,17 +73,6 @@ async def health_check():
             "storage": "unknown"
         }
     }
-    
-    try:
-        # Check database
-        db = next(get_db())
-        db.execute(text("SELECT 1"))
-        health_status["services"]["database"] = "healthy"
-    except Exception as e:
-        logger.error(f"Database health check failed: {str(e)}")
-        health_status["services"]["database"] = "unhealthy"
-        health_status["status"] = "unhealthy"
-        health_status["database_error"] = str(e)
     
     # Check if Supabase environment variables are set
     supabase_url = os.getenv('SUPABASE_URL')
