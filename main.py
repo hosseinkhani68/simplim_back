@@ -53,12 +53,11 @@ app.add_middleware(
 @app.get("/")
 async def root():
     """Root endpoint for health check"""
-    return {
-        "status": "ok",
-        "message": "Simplim API is running",
-        "environment": ENVIRONMENT,
-        "timestamp": datetime.utcnow().isoformat()
-    }
+    try:
+        return {"status": "ok"}
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        return {"status": "error", "message": str(e)}
 
 @app.get("/health")
 async def health_check():
@@ -97,17 +96,25 @@ async def health_check():
 async def startup_event():
     """Initialize services on startup"""
     try:
-        # Initialize database
-        init_db()
-        logger.info("Database connection initialized during startup")
+        logger.info("Starting application initialization...")
         
         # Log environment variables (without sensitive data)
+        logger.info(f"ENVIRONMENT: {ENVIRONMENT}")
+        logger.info(f"PORT: {PORT}")
         logger.info(f"SUPABASE_URL is set: {bool(os.getenv('SUPABASE_URL'))}")
         logger.info(f"SUPABASE_KEY is set: {bool(os.getenv('SUPABASE_KEY'))}")
         logger.info(f"SUPABASE_BUCKET_NAME: {os.getenv('SUPABASE_BUCKET_NAME', 'pdfs')}")
+        
+        # Initialize database
+        logger.info("Initializing database connection...")
+        init_db()
+        logger.info("Database connection initialized successfully")
+        
+        logger.info("Application startup completed successfully")
             
     except Exception as e:
         logger.error(f"Error during startup: {str(e)}")
+        logger.exception("Detailed startup error:")
         # Don't raise the exception, let the app start without database
 
 @app.get("/db-status")
