@@ -30,7 +30,14 @@ app = FastAPI(
 )
 
 # Initialize storage service
-storage_service = SupabaseStorageService()
+storage_service = None
+
+def get_storage_service():
+    """Lazy initialization of storage service"""
+    global storage_service
+    if storage_service is None:
+        storage_service = SupabaseStorageService()
+    return storage_service
 
 # Include routers
 app.include_router(auth.router, prefix="/auth", tags=["authentication"])

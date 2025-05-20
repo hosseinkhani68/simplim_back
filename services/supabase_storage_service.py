@@ -2,7 +2,7 @@ from supabase import create_client, Client
 import os
 from datetime import datetime
 import logging
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 from fastapi import UploadFile
 import mimetypes
 import requests
@@ -14,62 +14,58 @@ logger = logging.getLogger(__name__)
 
 class SupabaseStorageService:
     def __init__(self):
-        self.supabase_url = os.getenv('SUPABASE_URL')
-        self.supabase_key = os.getenv('SUPABASE_KEY')
-        self.bucket_name = os.getenv('SUPABASE_BUCKET_NAME', 'pdfs')
+        """Initialize the storage service with lazy loading"""
         self._client = None
-        
-        # Log configuration (without sensitive data)
-        logger.info(f"Initializing Supabase storage service with URL: {bool(self.supabase_url)}")
-        logger.info(f"Using bucket: {self.bucket_name}")
-        
-        if not self.supabase_url or not self.supabase_key:
-            logger.warning("Supabase URL or key not set in environment variables")
-        else:
-            # Try to initialize the client, but don't fail if it doesn't work
+        self._initialized = False
+        self._bucket_name = os.getenv('SUPABASE_BUCKET_NAME', 'pdfs')
+        logger.info(f"SupabaseStorageService initialized with bucket: {self._bucket_name}")
+
+    def _ensure_initialized(self):
+        """Ensure the client is initialized"""
+        if not self._initialized:
             try:
-                self._client = create_client(self.supabase_url, self.supabase_key)
-                logger.info("Successfully initialized Supabase client")
-            except Exception as e:
-                logger.warning(f"Failed to initialize Supabase client: {str(e)}")
-                self._client = None
-    
-    @property
-    def client(self) -> Client:
-        """Lazy initialization of Supabase client"""
-        if self._client is None:
-            if not self.supabase_url or not self.supabase_key:
-                raise ValueError("Supabase URL and key must be set in environment variables")
-            try:
-                self._client = create_client(self.supabase_url, self.supabase_key)
-                logger.info("Successfully initialized Supabase client")
+                supabase_url = os.getenv('SUPABASE_URL')
+                supabase_key = os.getenv('SUPABASE_KEY')
+                
+                if not supabase_url or not supabase_key:
+                    logger.warning("Supabase credentials not found. Storage operations will fail.")
+                    return False
+                
+                self._client = create_client(supabase_url, supabase_key)
+                self._initialized = True
+                logger.info("Supabase client initialized successfully")
+                return True
             except Exception as e:
                 logger.error(f"Failed to initialize Supabase client: {str(e)}")
-                raise ValueError(f"Failed to initialize Supabase client: {str(e)}")
-        return self._client
+                return False
+        return True
 
-    async def upload_file(self, file: UploadFile, user_id: int) -> Optional[dict]:
+    async def upload_file(self, file: UploadFile, filename: str = None) -> Optional[Dict[str, Any]]:
         """Upload a file to Supabase Storage"""
         try:
+            if not self._ensure_initialized():
+                logger.error("Cannot upload file: Supabase client not initialized")
+                return None
+
             # Verify client is initialized
             if not self._client:
                 logger.error("Supabase client not initialized")
                 raise ValueError("Supabase client not initialized")
 
             # Log configuration status
-            logger.info(f"Attempting to upload file for user {user_id}")
-            logger.info(f"Supabase URL configured: {bool(self.supabase_url)}")
-            logger.info(f"Supabase Key configured: {bool(self.supabase_key)}")
-            logger.info(f"Using bucket: {self.bucket_name}")
+            logger.info(f"Attempting to upload file for user {filename}")
+            logger.info(f"Supabase URL configured: {bool(os.getenv('SUPABASE_URL'))}")
+            logger.info(f"Supabase Key configured: {bool(os.getenv('SUPABASE_KEY'))}")
+            logger.info(f"Using bucket: {self._bucket_name}")
 
             # Verify bucket exists
             try:
                 buckets = self._client.storage.list_buckets()
                 bucket_names = [bucket.name for bucket in buckets]
-                if self.bucket_name not in bucket_names:
-                    logger.error(f"Bucket '{self.bucket_name}' not found in Supabase. Available buckets: {bucket_names}")
-                    raise ValueError(f"Bucket '{self.bucket_name}' not found in Supabase")
-                logger.info(f"Verified bucket '{self.bucket_name}' exists")
+                if self._bucket_name not in bucket_names:
+                    logger.error(f"Bucket '{self._bucket_name}' not found in Supabase. Available buckets: {bucket_names}")
+                    raise ValueError(f"Bucket '{self._bucket_name}' not found in Supabase")
+                logger.info(f"Verified bucket '{self._bucket_name}' exists")
             except Exception as bucket_error:
                 logger.error(f"Error checking bucket existence: {str(bucket_error)}")
                 raise ValueError(f"Error checking bucket existence: {str(bucket_error)}")
@@ -88,7 +84,7 @@ class SupabaseStorageService:
             # Generate unique filename
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             safe_filename = f"{timestamp}_{file.filename}"
-            file_path = f"users/{user_id}/{safe_filename}"
+            file_path = f"users/{filename}/{safe_filename}"
             logger.info(f"Generated file path: {file_path}")
             
             try:
@@ -96,12 +92,12 @@ class SupabaseStorageService:
                 logger.info("Attempting to upload to Supabase Storage...")
                 try:
                     # Construct the upload URL
-                    upload_url = f"{self.supabase_url}/storage/v1/object/{self.bucket_name}/{file_path}"
+                    upload_url = f"{os.getenv('SUPABASE_URL')}/storage/v1/object/{self._bucket_name}/{file_path}"
                     logger.info(f"Upload URL: {upload_url}")
 
                     # Set up headers
                     headers = {
-                        "Authorization": f"Bearer {self.supabase_key}",
+                        "Authorization": f"Bearer {os.getenv('SUPABASE_KEY')}",
                         "Content-Type": file.content_type or "application/pdf",
                         "x-upsert": "true"  # Enable upsert
                     }
@@ -137,7 +133,7 @@ class SupabaseStorageService:
 
                 # Get public URL
                 try:
-                    url = self._client.storage.from_(self.bucket_name).get_public_url(file_path)
+                    url = self._client.storage.from_(self._bucket_name).get_public_url(file_path)
                     logger.info(f"Generated public URL: {url}")
                 except Exception as url_error:
                     logger.error(f"Error getting public URL: {str(url_error)}")
@@ -164,11 +160,15 @@ class SupabaseStorageService:
             logger.error(f"Error uploading file to Supabase: {str(e)}")
             return None
 
-    async def delete_file(self, filename: str, user_id: int) -> bool:
+    async def delete_file(self, filename: str) -> bool:
         """Delete a file from Supabase Storage"""
         try:
-            file_path = f"users/{user_id}/{filename}"
-            self.client.storage.from_(self.bucket_name).remove([file_path])
+            if not self._ensure_initialized():
+                logger.error("Cannot delete file: Supabase client not initialized")
+                return False
+
+            file_path = f"users/{filename}/{filename}"
+            self._client.storage.from_(self._bucket_name).remove([file_path])
             logger.info(f"File deleted successfully from Supabase: {file_path}")
             return True
             
@@ -176,11 +176,15 @@ class SupabaseStorageService:
             logger.error(f"Error deleting file from Supabase: {str(e)}")
             return False
 
-    async def get_file_url(self, filename: str, user_id: int) -> Optional[str]:
+    async def get_file_url(self, filename: str) -> Optional[str]:
         """Get the public URL for a file"""
         try:
-            file_path = f"users/{user_id}/{filename}"
-            url = self.client.storage.from_(self.bucket_name).get_public_url(file_path)
+            if not self._ensure_initialized():
+                logger.error("Cannot get file URL: Supabase client not initialized")
+                return None
+
+            file_path = f"users/{filename}/{filename}"
+            url = self._client.storage.from_(self._bucket_name).get_public_url(file_path)
             return url
             
         except Exception as e:
@@ -191,7 +195,7 @@ class SupabaseStorageService:
         """List all files for a specific user"""
         try:
             prefix = f"users/{user_id}/"
-            response = self.client.storage.from_(self.bucket_name).list(prefix)
+            response = self._client.storage.from_(self._bucket_name).list(prefix)
             
             files = []
             for item in response:
@@ -200,7 +204,7 @@ class SupabaseStorageService:
                     "size": item["metadata"]["size"],
                     "created": item["created_at"],
                     "updated": item["updated_at"],
-                    "url": self.client.storage.from_(self.bucket_name).get_public_url(item["name"])
+                    "url": self._client.storage.from_(self._bucket_name).get_public_url(item["name"])
                 })
             
             return files
@@ -213,7 +217,7 @@ class SupabaseStorageService:
         """Get metadata for a specific file"""
         try:
             file_path = f"users/{user_id}/{filename}"
-            response = self.client.storage.from_(self.bucket_name).get_public_url(file_path)
+            response = self._client.storage.from_(self._bucket_name).get_public_url(file_path)
             
             if response:
                 return {
