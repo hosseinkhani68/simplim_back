@@ -28,12 +28,9 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# Initialize storage service
-storage_service = None
 
 # Include routers
 app.include_router(auth.router, prefix="/auth", tags=["authentication"])
-logger.info("Routers included successfully")
 
 # Log all registered routes
 logger.info("Registered routes:")
@@ -50,9 +47,13 @@ app.add_middleware(
 
 @app.get("/")
 async def root():
-    """Root endpoint for health check"""
-    logger.info("Health check endpoint called")
-    return {"status": "ok"}
+    """Root endpoint"""
+    return {
+        "status": "ok",
+        "message": "Simplim API is running",
+        "environment": ENVIRONMENT,
+        "timestamp": datetime.utcnow().isoformat()
+    }
 
 @app.get("/health")
 async def health_check():
@@ -63,20 +64,38 @@ async def health_check():
         "environment": ENVIRONMENT,
         "timestamp": datetime.utcnow().isoformat(),
         "services": {
-            "database": "unknown"
+            "database": "unknown",
+            "storage": "unknown"
         }
     }
     
-    # Try to check database connection, but don't fail if it's not ready
     try:
+        # Check database
         db = next(get_db())
         db.execute(text("SELECT 1"))
-        db.close()
-        health_status["services"]["database"] = "connected"
+        health_status["services"]["database"] = "healthy"
     except Exception as e:
-        logger.warning(f"Database not ready yet: {str(e)}")
-        health_status["services"]["database"] = "initializing"
-        # Don't mark the entire service as unhealthy just because DB isn't ready
+        logger.error(f"Database health check failed: {str(e)}")
+        health_status["services"]["database"] = "unhealthy"
+        health_status["status"] = "unhealthy"
+        health_status["database_error"] = str(e)
+    
+    # Check if Supabase environment variables are set
+    supabase_url = os.getenv('SUPABASE_URL')
+    supabase_key = os.getenv('SUPABASE_KEY')
+    bucket_name = os.getenv('SUPABASE_BUCKET_NAME', 'pdfs')
+    
+    health_status["storage"] = {
+        "bucket": bucket_name,
+        "url_set": bool(supabase_url),
+        "key_set": bool(supabase_key),
+        "status": "configured" if (supabase_url and supabase_key) else "not_configured"
+    }
+    
+    # Only mark storage as unhealthy if environment variables are missing
+    if not (supabase_url and supabase_key):
+        health_status["services"]["storage"] = "unhealthy"
+        health_status["status"] = "unhealthy"
     
     return health_status
 
@@ -84,27 +103,18 @@ async def health_check():
 async def startup_event():
     """Initialize services on startup"""
     try:
-        logger.info("Starting application initialization...")
-        logger.info(f"ENVIRONMENT: {ENVIRONMENT}")
-        logger.info(f"PORT: {PORT}")
-        
         # Initialize database
         init_db()
-        logger.info("Database initialized successfully")
+        logger.info("Database connection initialized during startup")
         
-        # Log environment variables (without sensitive values)
-        env_vars = {
-            "ENVIRONMENT": ENVIRONMENT,
-            "PORT": PORT
-        }
-        logger.info(f"Environment variables: {env_vars}")
-        
-        logger.info("Application startup completed successfully")
+        # Log environment variables (without sensitive data)
+        logger.info(f"SUPABASE_URL is set: {bool(os.getenv('SUPABASE_URL'))}")
+        logger.info(f"SUPABASE_KEY is set: {bool(os.getenv('SUPABASE_KEY'))}")
+        logger.info(f"SUPABASE_BUCKET_NAME: {os.getenv('SUPABASE_BUCKET_NAME', 'pdfs')}")
             
     except Exception as e:
         logger.error(f"Error during startup: {str(e)}")
-        logger.exception("Detailed startup error:")
-        raise  # Raise the exception to prevent the app from starting with a broken database
+        # Don't raise the exception, let the app start without database
 
 @app.get("/db-status")
 async def db_status(db: Session = Depends(get_db)):
