@@ -61,11 +61,15 @@ def init_db():
         engine = create_engine(
             db_url,
             pool_pre_ping=True,  # Enable connection health checks
-            pool_recycle=3600,   # Recycle connections after 1 hour
+            pool_recycle=1800,   # Recycle connections after 30 minutes
+            pool_size=20,        # Maximum number of connections to keep
+            max_overflow=10,     # Maximum number of connections that can be created beyond pool_size
+            pool_timeout=30,     # Seconds to wait before giving up on getting a connection from the pool
             connect_args={
-                "connect_timeout": 10,  # Connection timeout in seconds
-                "read_timeout": 10,     # Read timeout in seconds
-                "write_timeout": 10     # Write timeout in seconds
+                "connect_timeout": 5,    # Connection timeout in seconds
+                "read_timeout": 5,       # Read timeout in seconds
+                "write_timeout": 5,      # Write timeout in seconds
+                "charset": "utf8mb4"     # Use utf8mb4 charset
             }
         )
         

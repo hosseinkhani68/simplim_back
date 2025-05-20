@@ -9,7 +9,6 @@ import logging
 from datetime import datetime
 from sqlalchemy import text
 from routers import auth, pdf
-from services.supabase_storage_service import SupabaseStorageService
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -32,16 +31,8 @@ app = FastAPI(
 # Initialize storage service
 storage_service = None
 
-def get_storage_service():
-    """Lazy initialization of storage service"""
-    global storage_service
-    if storage_service is None:
-        storage_service = SupabaseStorageService()
-    return storage_service
-
 # Include routers
 app.include_router(auth.router, prefix="/auth", tags=["authentication"])
-app.include_router(pdf.router, prefix="/pdf", tags=["pdf"])
 logger.info("Routers included successfully")
 
 # Log all registered routes
@@ -72,27 +63,9 @@ async def health_check():
         "environment": ENVIRONMENT,
         "timestamp": datetime.utcnow().isoformat(),
         "services": {
-            "database": "unknown",
-            "storage": "unknown"
+            "database": "unknown"
         }
     }
-    
-    # Check if Supabase environment variables are set
-    supabase_url = os.getenv('SUPABASE_URL')
-    supabase_key = os.getenv('SUPABASE_KEY')
-    bucket_name = os.getenv('SUPABASE_BUCKET_NAME', 'pdfs')
-    
-    health_status["storage"] = {
-        "bucket": bucket_name,
-        "url_set": bool(supabase_url),
-        "key_set": bool(supabase_key),
-        "status": "configured" if (supabase_url and supabase_key) else "not_configured"
-    }
-    
-    # Only mark storage as unhealthy if environment variables are missing
-    if not (supabase_url and supabase_key):
-        health_status["services"]["storage"] = "unhealthy"
-        health_status["status"] = "unhealthy"
     
     return health_status
 
@@ -104,13 +77,10 @@ async def startup_event():
         logger.info(f"ENVIRONMENT: {ENVIRONMENT}")
         logger.info(f"PORT: {PORT}")
         
-        # Log all environment variables (without sensitive values)
+        # Log environment variables (without sensitive values)
         env_vars = {
             "ENVIRONMENT": ENVIRONMENT,
-            "PORT": PORT,
-            "SUPABASE_URL_SET": bool(os.getenv('SUPABASE_URL')),
-            "SUPABASE_KEY_SET": bool(os.getenv('SUPABASE_KEY')),
-            "SUPABASE_BUCKET_NAME": os.getenv('SUPABASE_BUCKET_NAME', 'pdfs')
+            "PORT": PORT
         }
         logger.info(f"Environment variables: {env_vars}")
         
