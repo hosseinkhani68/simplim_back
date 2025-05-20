@@ -60,17 +60,8 @@ app.add_middleware(
 @app.get("/")
 async def root():
     """Root endpoint for health check"""
-    try:
-        # Basic health check that doesn't depend on any external services
-        return {
-            "status": "ok",
-            "message": "Service is running",
-            "timestamp": datetime.utcnow().isoformat()
-        }
-    except Exception as e:
-        logger.error(f"Health check failed: {str(e)}")
-        # Even if there's an error, return a 200 status to pass health check
-        return {"status": "ok", "message": "Service is running"}
+    logger.info("Health check endpoint called")
+    return {"status": "ok"}
 
 @app.get("/health")
 async def health_check():
@@ -110,33 +101,18 @@ async def startup_event():
     """Initialize services on startup"""
     try:
         logger.info("Starting application initialization...")
-        
-        # Log environment variables (without sensitive data)
         logger.info(f"ENVIRONMENT: {ENVIRONMENT}")
         logger.info(f"PORT: {PORT}")
         
-        # Check Supabase configuration
-        supabase_url = os.getenv('SUPABASE_URL')
-        supabase_key = os.getenv('SUPABASE_KEY')
-        bucket_name = os.getenv('SUPABASE_BUCKET_NAME', 'pdfs')
-        
-        logger.info(f"SUPABASE_URL is set: {bool(supabase_url)}")
-        logger.info(f"SUPABASE_KEY is set: {bool(supabase_key)}")
-        logger.info(f"SUPABASE_BUCKET_NAME: {bucket_name}")
-        
-        if not supabase_url or not supabase_key:
-            logger.warning("Supabase configuration is incomplete. Some features may not work.")
-        else:
-            logger.info("Supabase configuration is complete")
-        
-        # Initialize database
-        logger.info("Initializing database connection...")
-        try:
-            init_db()
-            logger.info("Database connection initialized successfully")
-        except Exception as db_error:
-            logger.error(f"Database initialization failed: {str(db_error)}")
-            logger.warning("Continuing without database connection")
+        # Log all environment variables (without sensitive values)
+        env_vars = {
+            "ENVIRONMENT": ENVIRONMENT,
+            "PORT": PORT,
+            "SUPABASE_URL_SET": bool(os.getenv('SUPABASE_URL')),
+            "SUPABASE_KEY_SET": bool(os.getenv('SUPABASE_KEY')),
+            "SUPABASE_BUCKET_NAME": os.getenv('SUPABASE_BUCKET_NAME', 'pdfs')
+        }
+        logger.info(f"Environment variables: {env_vars}")
         
         logger.info("Application startup completed successfully")
             
